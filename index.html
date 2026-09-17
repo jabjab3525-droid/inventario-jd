@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.3/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
   :root{
     --amarillo:#FFC400;
@@ -203,9 +204,52 @@
     .field-row{grid-template-columns:1fr;}
     table{font-size:11.5px;} thead th,tbody td{padding:7px 7px;}
   }
+
+  /* ---------- LOGIN ---------- */
+  body.sin-sesion #sidebar, body.sin-sesion #main-wrap, body.sin-sesion #asistenteBtn, body.sin-sesion #asistentePanel{display:none;}
+  #loginOverlay{display:none;position:fixed;inset:0;background:var(--negro);z-index:999;align-items:center;justify-content:center;padding:20px;}
+  body.sin-sesion #loginOverlay{display:flex;}
+  .login-box{background:var(--panel);border:1px solid var(--borde);border-top:4px solid var(--amarillo);border-radius:14px;padding:30px 26px;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.5);}
+  .login-box h2{font-family:var(--font-d);color:var(--amarillo);margin:0 0 4px;font-size:19px;}
+  .login-box .sub{font-size:12px;color:var(--tenue);margin-bottom:20px;}
+  .perfil-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;}
+  .perfil-btn{background:var(--panel2);border:1.5px solid var(--borde);color:var(--texto);border-radius:9px;padding:12px 8px;text-align:center;cursor:pointer;font-family:var(--font-b);font-weight:700;font-size:12.5px;}
+  .perfil-btn:hover,.perfil-btn.sel{border-color:var(--amarillo);color:var(--amarillo);background:var(--amarillo-op);}
+  .perfil-btn .rol{display:block;font-size:9.5px;color:var(--tenue);font-weight:600;text-transform:uppercase;margin-top:2px;}
+  .perfil-btn.sel .rol{color:var(--amarillo);}
+  .user-pill{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--borde);padding:6px 12px;border-radius:999px;font-size:11.5px;}
+  .user-pill b{color:var(--amarillo);}
+
+  /* ---------- ASISTENTE IA ---------- */
+  #asistenteBtn{position:fixed;bottom:24px;right:24px;z-index:150;width:56px;height:56px;border-radius:50%;background:var(--amarillo);color:var(--negro);border:none;font-size:24px;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.4);}
+  #asistentePanel{position:fixed;bottom:92px;right:24px;z-index:150;width:340px;max-width:calc(100vw - 32px);height:440px;max-height:70vh;background:var(--panel);border:1px solid var(--borde);border-top:4px solid var(--amarillo);border-radius:14px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.5);}
+  #asistentePanel.open{display:flex;}
+  .asis-head{padding:12px 14px;border-bottom:1px solid var(--borde);font-family:var(--font-d);font-weight:700;font-size:13px;color:var(--amarillo);display:flex;justify-content:space-between;align-items:center;}
+  .asis-body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+  .asis-msg{max-width:88%;padding:9px 12px;border-radius:10px;font-size:12.5px;line-height:1.4;}
+  .asis-msg.bot{background:var(--panel2);align-self:flex-start;}
+  .asis-msg.user{background:var(--amarillo-op);color:var(--amarillo);align-self:flex-end;}
+  .asis-foot{display:flex;gap:6px;padding:10px;border-top:1px solid var(--borde);}
+  .asis-foot input{flex:1;background:var(--negro);border:1.5px solid var(--borde);color:var(--texto);padding:8px 10px;border-radius:8px;font-size:12.5px;}
+
+  /* ---------- ESCÁNER ---------- */
+  #scannerVideoWrap{background:#000;border-radius:10px;overflow:hidden;position:relative;}
+  #scannerVideoWrap video{width:100%;display:block;}
+  .scan-line{position:absolute;left:6%;right:6%;top:50%;height:2px;background:var(--amarillo);box-shadow:0 0 8px var(--amarillo);}
 </style>
 </head>
-<body>
+<body class="sin-sesion">
+
+<div id="loginOverlay">
+  <div class="login-box">
+    <h2>🔒 DEUZ JD</h2>
+    <div class="sub">Selecciona tu perfil e ingresa tu clave para entrar.</div>
+    <div class="perfil-grid" id="perfilGrid"></div>
+    <div class="field"><label>Clave</label><input type="password" id="loginPin" inputmode="numeric" maxlength="6" placeholder="••••" onkeydown="if(event.key==='Enter')intentarLogin()"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="intentarLogin()">Ingresar</button>
+    <div class="hint" id="loginError" style="color:var(--rojo);margin-top:8px;"></div>
+  </div>
+</div>
 
 <aside id="sidebar">
   <div class="sb-brand">
@@ -218,11 +262,13 @@
     <button class="sb-item" data-tab="total"><span class="ic">📊</span> Inventario Total</button>
     <button class="sb-item" data-tab="canastillas"><span class="ic">🧺</span> Canastillas</button>
     <button class="sb-item" data-tab="mapa"><span class="ic">🗺️</span> Mapa Almacén 5</button>
+    <button class="sb-item" data-tab="bodegas"><span class="ic">🏭</span> Distribución de Bodegas</button>
     <button class="sb-item" data-tab="comercial"><span class="ic">🧑‍💼</span> Comercial</button>
     <button class="sb-item" data-tab="verificacion"><span class="ic">🔍</span> Verificación de Conteo</button>
     <button class="sb-item" data-tab="movimientos"><span class="ic">↕️</span> Entradas/Salidas</button>
   </nav>
-  <button class="sb-item" onclick="abrirModalNube()" style="border-top:1px solid var(--borde);border-radius:0;margin-top:auto;"><span class="ic">⚙️</span> Sincronización en la nube</button>
+  <button class="sb-item" id="btnConfigNube" onclick="abrirModalNube()" style="border-top:1px solid var(--borde);border-radius:0;margin-top:auto;"><span class="ic">⚙️</span> Sincronización en la nube</button>
+  <button class="sb-item" onclick="cerrarSesionUsuario()"><span class="ic">🚪</span> Cerrar sesión</button>
   <div class="sb-foot">Guardado local garantizado. Última copia de seguridad: <span id="sbBackupTime">—</span></div>
 </aside>
 
@@ -230,6 +276,7 @@
   <div id="topbar">
     <h1 id="topbarTitle">Panel general</h1>
     <div class="top-right">
+      <div class="user-pill">👤 <b id="userPillNombre">—</b></div>
       <div class="sync-pill"><span class="sync-dot" id="syncDot"></span><span id="syncText">Sincronizado</span></div>
       <div class="clock"><div class="hora" id="clockHora">--:--:--</div><div class="fecha" id="clockFecha">—</div></div>
     </div>
@@ -277,6 +324,12 @@
       <div class="panel-title">🔳 Códigos QR y de barras</div>
       <div class="hint" style="margin-bottom:12px;">Descarga una hoja imprimible con el QR de TODOS los productos (Importación + Inventario Total) para pegarlos en las canastillas o estanterías.</div>
       <button class="btn btn-primary" onclick="descargarTodosLosQR()">⬇ Descargar / imprimir todos los QR</button>
+    </div>
+
+    <div class="panel-box">
+      <div class="panel-title">⚠️ Stock bajo</div>
+      <p class="hint" style="margin-bottom:10px;">Productos por debajo de su alerta de stock (configúrala al editar cada producto).</p>
+      <div id="listaStockBajo"></div>
     </div>
 
     <div class="panel-box">
@@ -385,6 +438,36 @@
     </div>
   </section>
 
+  <!-- ============ DISTRIBUCIÓN DE BODEGAS ============ -->
+  <section id="tab-bodegas" style="display:none;">
+    <div class="panel-box">
+      <div class="panel-title">🏭 Bodegas activas</div>
+      <p class="hint" style="margin-bottom:12px;">Resumen de referencias y unidades por bodega. Bodega Bosa ya está disponible para asignar material.</p>
+      <div class="stats-row" id="resumenBodegas"></div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-title">↔️ Mover material entre bodegas</div>
+      <p class="hint" style="margin-bottom:12px;">Marca los productos y elige a qué bodega enviarlos (ej: Bosa, 5, 8, o escribe una nueva).</p>
+      <div class="toolbar">
+        <div class="search-box"><input type="text" id="searchBodegas" placeholder="Buscar por SKU o descripción..." oninput="renderBodegas()"></div>
+        <select class="plain" id="bodDestino">
+          <option value="Bosa">Bosa</option>
+          <option value="5">5</option>
+          <option value="8">8</option>
+          <option value="__otra">Otra (escribir)...</option>
+        </select>
+        <button class="btn btn-primary" onclick="moverSeleccionADestino()">➡ Mover seleccionados</button>
+      </div>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th style="width:36px;"><input type="checkbox" id="chkTodosBodegas" onclick="toggleTodosBodegas(this)"></th><th style="width:120px;">SKU</th><th style="width:90px;">Bodega actual</th><th>Descripción</th><th style="width:100px;">Saldo</th></tr></thead>
+        <tbody id="tablaBodegas"></tbody>
+      </table>
+      </div>
+      <div id="bodegasEmpty" class="empty-state" style="display:none;"><div class="ic">🏭</div><h3>Sin productos de importación</h3></div>
+    </div>
+  </section>
+
   <!-- ============ MOVIMIENTOS ============ -->
   <!-- ============ VERIFICACIÓN DE CONTEO ============ -->
   <!-- ============ COMERCIAL ============ -->
@@ -429,11 +512,21 @@
   </section>
 
   <section id="tab-movimientos" style="display:none;">
+    <div class="panel-box">
+      <div class="panel-title">🕵️ Actividad por persona (últimos 7 días)</div>
+      <div class="stats-row" id="resumenActividadPersona"></div>
+    </div>
     <div class="toolbar">
       <div class="search-box"><input type="text" id="searchMov" placeholder="Buscar en historial..."></div>
+      <select class="plain" id="filterResponsableMov" onchange="renderMovimientos()"><option value="">Todos los responsables</option></select>
       <button class="btn btn-primary" onclick="abrirModalMovimiento('entrada')">⬇ Registrar entrada</button>
       <button class="btn btn-primary" onclick="abrirModalMovimiento('salida')">⬆ Registrar salida</button>
-      <button class="btn btn-green" onclick="exportarExcelGenerico(movimientos.map(m=>({FECHA:fmtFecha(m.fecha),TIPO:m.tipo==='entrada'?'Entrada':'Salida',SKU:m.sku,DESCRIPCION:m.desc,CANTIDAD:m.cantidad,RESPONSABLE:m.responsable||'',PROVEEDOR:m.proveedor||'',NUM_GUIA:m.guia||'',OBSERVACION:m.obs||''})),'JD_Movimientos')">⬇ Exportar historial</button>
+      <button class="btn btn-ghost" onclick="abrirEscaner()">📷 Escanear con cámara</button>
+    </div>
+    <div class="toolbar">
+      <button class="btn btn-green" onclick="generarReporte('dia')">⬇ Reporte de hoy</button>
+      <button class="btn btn-green" onclick="generarReporte('semana')">⬇ Reporte de la semana</button>
+      <button class="btn btn-green" onclick="exportarExcelGenerico(movimientos.map(m=>({FECHA:fmtFecha(m.fecha),TIPO:m.tipo==='entrada'?'Entrada':'Salida',SKU:m.sku,DESCRIPCION:m.desc,CANTIDAD:m.cantidad,RESPONSABLE:m.responsable||'',PROVEEDOR:m.proveedor||'',NUM_GUIA:m.guia||'',OBSERVACION:m.obs||''})),'JD_Movimientos')">⬇ Exportar historial completo</button>
     </div>
     <div style="overflow-x:auto;">
     <table>
@@ -454,13 +547,14 @@
   <input type="hidden" id="impEditId">
   <div class="field-row">
     <div class="field"><label>SKU</label><input id="impSku" placeholder="Automático (iniciales) si se deja vacío"></div>
-    <div class="field"><label>Bodega / Piso</label><input id="impBod" placeholder="Ej: 5, 8"></div>
+    <div class="field"><label>Bodega / Piso</label><input id="impBod" list="listaBodegas" placeholder="Ej: 5, 8, Bosa"><datalist id="listaBodegas"><option value="5"><option value="8"><option value="Bosa"></datalist></div>
   </div>
   <div class="field"><label>Descripción</label><textarea id="impDesc" rows="2"></textarea></div>
   <div class="field-row">
     <div class="field"><label>Saldo</label><input id="impSaldo" type="number"></div>
     <div class="field"><label>Canastilla(s) — separadas por coma</label><input id="impCanast" placeholder="Ej: 3C, 290"></div>
   </div>
+  <div class="field"><label>Alerta de stock bajo (unidades)</label><input id="impUmbral" type="number" placeholder="Ej: 5"></div>
   <div class="modal-actions"><button class="btn btn-ghost" onclick="cerrarModal('modalImportacion')">Cancelar</button><button class="btn btn-primary" onclick="guardarImportacion()">Guardar</button></div>
 </div></div>
 
@@ -477,6 +571,7 @@
     <div class="field"><label>Contado por</label><input id="totContadoPor" placeholder="Nombre de quien contó"></div>
     <div class="field"><label>Canastilla(s) — separadas por coma</label><input id="totCanast" placeholder="Ej: 4C, 176"></div>
   </div>
+  <div class="field"><label>Alerta de stock bajo (unidades)</label><input id="totUmbral" type="number" placeholder="Ej: 5"></div>
   <div class="modal-actions"><button class="btn btn-ghost" onclick="cerrarModal('modalTotal')">Cancelar</button><button class="btn btn-primary" onclick="guardarTotal()">Guardar</button></div>
 </div></div>
 
@@ -542,6 +637,23 @@
   </div>
 </div></div>
 
+<div class="modal-bg" id="modalEscaner"><div class="modal">
+  <h2>📷 Escanear código</h2>
+  <div id="scannerVideoWrap"><video id="scannerVideo" playsinline muted></video><div class="scan-line"></div></div>
+  <div class="hint" id="scannerHint" style="margin-top:10px;">Apunta la cámara al QR o código de barras del producto.</div>
+  <div class="modal-actions"><button class="btn btn-ghost" onclick="cerrarEscaner()">Cerrar</button></div>
+</div></div>
+
+<button id="asistenteBtn" onclick="toggleAsistente()" title="Asistente de materiales">🤖</button>
+<div id="asistentePanel">
+  <div class="asis-head"><span>🤖 Asistente de materiales</span><button class="btn btn-ghost btn-sm" onclick="toggleAsistente()">✕</button></div>
+  <div class="asis-body" id="asistenteBody"></div>
+  <div class="asis-foot">
+    <input type="text" id="asistenteInput" placeholder="Ej: ¿dónde está el contactor 40A?" onkeydown="if(event.key==='Enter')preguntarAsistente()">
+    <button class="btn btn-primary btn-sm" onclick="preguntarAsistente()">➤</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -557,7 +669,83 @@ let totalInv = [];
 let canastillas = [];
 let movimientos = [];
 
-const K_IMP='jd3_importacion', K_TOT='jd3_total', K_CAN='jd3_canastillas', K_MOV='jd3_movimientos', K_BACKUP='jd3_backup_latest';
+const K_IMP='jd3_importacion', K_TOT='jd3_total', K_CAN='jd3_canastillas', K_MOV='jd3_movimientos', K_BACKUP='jd3_backup_latest', K_PIN='jd3_pines';
+
+/* ---------------- LOGIN / PERFILES ---------------- */
+// Auxiliar 1=Wilmer, Auxiliar 2=Luis, Auxiliar 3=Brayan (acceso total, igual que el Coordinador).
+// El perfil "comercial" solo puede ver la pestaña Comercial. Las claves por defecto se pueden
+// cambiar desde ⚙️ Sincronización en la nube → Claves de acceso (solo lo ve el Coordinador).
+const PERFILES = {
+  wilmer:   {nombre:'Wilmer',   rol:'auxiliar',    pinDefecto:'1111'},
+  luis:     {nombre:'Luis',     rol:'auxiliar',    pinDefecto:'2222'},
+  brayan:   {nombre:'Brayan',   rol:'auxiliar',    pinDefecto:'3333'},
+  camila:   {nombre:'Camila',   rol:'coordinador', pinDefecto:'4444'},
+  comercial:{nombre:'Comercial',rol:'comercial',   pinDefecto:'5555'}
+};
+const TABS_TOTALES = ['dashboard','importacion','total','canastillas','mapa','bodegas','comercial','verificacion','movimientos'];
+let PINES = localGet(K_PIN) || {};
+let SESION = JSON.parse(localStorage.getItem('jd3_sesion')||'null');
+let usuarioSeleccionadoLogin = '';
+function pinDe(usuario){ return (PINES && PINES[usuario]) || PERFILES[usuario].pinDefecto; }
+function pintarPerfiles(){
+  const grid=document.getElementById('perfilGrid');
+  grid.innerHTML = Object.keys(PERFILES).map(u=>{
+    const p=PERFILES[u];
+    const rolLbl = p.rol==='auxiliar'?'Auxiliar':(p.rol==='coordinador'?'Coordinador':'Comercial');
+    return `<button type="button" class="perfil-btn" data-user="${u}" onclick="seleccionarPerfilLogin('${u}')">${p.nombre}<span class="rol">${rolLbl}</span></button>`;
+  }).join('');
+}
+function seleccionarPerfilLogin(u){
+  usuarioSeleccionadoLogin = u;
+  document.querySelectorAll('.perfil-btn').forEach(b=>b.classList.toggle('sel', b.dataset.user===u));
+  document.getElementById('loginError').textContent='';
+  document.getElementById('loginPin').value='';
+  document.getElementById('loginPin').focus();
+}
+function intentarLogin(){
+  const err = document.getElementById('loginError');
+  if(!usuarioSeleccionadoLogin){ err.textContent='Selecciona un perfil primero.'; return; }
+  const pin = document.getElementById('loginPin').value.trim();
+  if(pin !== pinDe(usuarioSeleccionadoLogin)){ err.textContent='Clave incorrecta.'; return; }
+  const p = PERFILES[usuarioSeleccionadoLogin];
+  SESION = {usuario:usuarioSeleccionadoLogin, nombre:p.nombre, rol:p.rol};
+  localStorage.setItem('jd3_sesion', JSON.stringify(SESION));
+  err.textContent='';
+  aplicarSesion();
+  if(PENDING_SKU){ abrirFichaRapidaPorSku(PENDING_SKU); PENDING_SKU=null; }
+}
+function cerrarSesionUsuario(){
+  if(!confirm('¿Cerrar sesión en este dispositivo?')) return;
+  SESION = null;
+  localStorage.removeItem('jd3_sesion');
+  usuarioSeleccionadoLogin='';
+  document.getElementById('loginPin').value='';
+  document.querySelectorAll('.perfil-btn').forEach(b=>b.classList.remove('sel'));
+  document.body.classList.add('sin-sesion');
+}
+function aplicarSesion(){
+  if(!SESION){ document.body.classList.add('sin-sesion'); return; }
+  document.body.classList.remove('sin-sesion');
+  document.getElementById('userPillNombre').textContent = SESION.nombre + ' · ' + (SESION.rol==='auxiliar'?'Auxiliar':SESION.rol==='coordinador'?'Coordinador':'Comercial');
+  const esComercial = SESION.rol==='comercial';
+  document.querySelectorAll('.sb-nav .sb-item[data-tab]').forEach(btn=>{
+    btn.style.display = (esComercial && btn.dataset.tab!=='comercial') ? 'none' : '';
+  });
+  const btnCfg = document.getElementById('btnConfigNube'); if(btnCfg) btnCfg.style.display = esComercial ? 'none' : '';
+  const asisBtn = document.getElementById('asistenteBtn'); if(asisBtn) asisBtn.style.display = esComercial ? 'none' : '';
+  cambiarTab(esComercial ? 'comercial' : (document.querySelector('.sb-nav .sb-item.active')?.dataset.tab || 'dashboard'));
+}
+function cambiarTab(tab){
+  if(SESION && SESION.rol==='comercial' && tab!=='comercial') tab='comercial';
+  document.querySelectorAll('.sb-nav .sb-item').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.getElementById('topbarTitle').textContent = TITULOS[tab];
+  TABS_TOTALES.forEach(t=>{ document.getElementById('tab-'+t).style.display = (t===tab) ? 'block' : 'none'; });
+  if(tab==='mapa') dibujarMapa();
+  if(tab==='verificacion') renderVerificacion();
+  if(tab==='comercial') renderComercial();
+  if(tab==='bodegas') renderBodegas();
+  if(tab==='movimientos') renderMovimientos();
+}
 /* La sincronización en la nube usa kvdb.io, que EXIGE crear una
    "bucket" real antes de usarla (no se puede inventar un nombre).
    La app crea la bucket la primera vez que se usa en un dispositivo
@@ -612,10 +800,15 @@ function renderConfigNube(){
         <button class="btn btn-ghost btn-sm" onclick="copiarLinkCompartir()">📋 Copiar link</button>
       </div>` : `<div class="hint">Para tener también un link con el código incluido, aloja el archivo en una URL web real (ver guía de GitHub Pages).</div>`}
       <div class="hint" style="margin-top:12px;">💡 Cada código QR de producto ya incluye este código automáticamente — cualquiera que lo escanee queda conectado sin hacer nada más.</div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--borde);">
+        <div class="hint" style="margin-bottom:8px;">¿Ves "Guardado local (sin nube)" arriba? El servicio gratuito tiene un límite de consultas por hora — nada se pierde, solo espera un rato y prueba este botón:</div>
+        <button class="btn btn-primary btn-sm" onclick="reintentarSincronizacion()" id="btnReintentarSync">🔁 Reintentar sincronización ahora</button>
+      </div>
       <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--borde);">
         <div class="hint" style="margin-bottom:8px;color:var(--rojo);">⚠️ Zona avanzada: reemplaza TODO el Inventario Total y las Canastillas (en este dispositivo y en la nube) por los datos más recientes que quedaron incrustados en el código. Se pierde cualquier conteo hecho después de la última actualización.</div>
         <button class="btn btn-danger btn-sm" onclick="resetearConDatosNuevos()">🔄 Restablecer catálogo con los datos nuevos</button>
-      </div>`;
+      </div>
+      ${htmlClavesAcceso()}`;
   } else {
     el.innerHTML = `
       <div class="hint" style="margin-bottom:12px;">Aún no hay sincronización en la nube configurada. El sistema funciona 100% local en este dispositivo hasta que actives esto.</div>
@@ -624,13 +817,58 @@ function renderConfigNube(){
       <div style="display:flex;gap:8px;">
         <input type="text" id="inputCodigoNube" placeholder="Pega el código aquí" style="flex:1;background:var(--negro);border:1.5px solid var(--borde);color:var(--texto);padding:9px 11px;border-radius:7px;font-size:13px;">
         <button class="btn btn-ghost btn-sm" onclick="usarCodigoExistente()">Usar</button>
-      </div>`;
+      </div>
+      ${htmlClavesAcceso()}`;
   }
+}
+function htmlClavesAcceso(){
+  if(!SESION || SESION.rol!=='coordinador') return '';
+  return `<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--borde);">
+    <div class="panel-title" style="font-size:13px;">🔑 Claves de acceso (solo Coordinador)</div>
+    ${Object.keys(PERFILES).map(u=>`
+      <div class="field-row" style="align-items:end;margin-bottom:8px;">
+        <div class="field" style="margin-bottom:0;"><label>${PERFILES[u].nombre}</label><input id="pin_${u}" type="text" inputmode="numeric" maxlength="6" value="${pinDe(u)}"></div>
+        <button class="btn btn-ghost btn-sm" onclick="guardarPin('${u}')">Guardar</button>
+      </div>`).join('')}
+    <div class="hint">Cada perfil entra con su nombre + esta clave. Cámbialas cuando quieras, quedan sincronizadas en todos los dispositivos.</div>
+  </div>`;
+}
+function guardarPin(u){
+  const val = document.getElementById('pin_'+u).value.trim();
+  if(!val){ toast('Escribe una clave'); return; }
+  PINES[u] = val;
+  localSet(K_PIN, PINES); cloudSet(K_PIN, PINES);
+  toast('Clave de '+PERFILES[u].nombre+' actualizada');
 }
 function copiarLinkCompartir(){
   const link = urlCompartirPrincipal();
   if(!link) return;
   navigator.clipboard.writeText(link).then(()=>toast('Link copiado')).catch(()=>toast('Copia manual: '+link));
+}
+async function reintentarSincronizacion(){
+  const btn = document.getElementById('btnReintentarSync');
+  if(btn){ btn.textContent = '⏳ Probando conexión...'; btn.disabled = true; }
+  // Primero intenta traer lo más reciente de la nube (por si otro dispositivo guardó algo mientras no había conexión)
+  const remotos = await Promise.all([cloudGet(K_IMP), cloudGet(K_TOT), cloudGet(K_CAN), cloudGet(K_MOV)]);
+  const huboRespuesta = remotos.every(r=>r!==undefined);
+  if(!huboRespuesta){
+    toast('Todavía sin respuesta de la nube — espera un poco más e intenta de nuevo');
+    if(btn){ btn.textContent = '🔁 Reintentar sincronización ahora'; btn.disabled = false; }
+    setSync(false);
+    return;
+  }
+  // Si la nube respondió, nos quedamos con lo más reciente que exista entre local y nube
+  if(remotos[0]) importacion = remotos[0];
+  if(remotos[1]) totalInv = remotos[1];
+  if(remotos[2]) canastillas = remotos[2];
+  if(remotos[3]) movimientos = remotos[3];
+  localSet(K_IMP,importacion); localSet(K_TOT,totalInv); localSet(K_CAN,canastillas); localSet(K_MOV,movimientos);
+  // Y empujamos lo que tenemos por si acaso, para dejar todo igualado
+  await cloudSet(K_IMP,importacion); await cloudSet(K_TOT,totalInv); await cloudSet(K_CAN,canastillas); await cloudSet(K_MOV,movimientos);
+  renderAll();
+  setSync(true);
+  toast('¡Sincronizado! Ya está al día con la nube');
+  if(btn){ btn.textContent = '🔁 Reintentar sincronización ahora'; btn.disabled = false; }
 }
 async function resetearConDatosNuevos(){
   if(!confirm('¿Seguro? Esto va a REEMPLAZAR todo el Inventario Total y las Canastillas actuales (en este dispositivo Y en la nube) por los datos que quedaron incrustados en el código. Cualquier conteo hecho después de la última actualización se perderá. ¿Continuar?')) return;
@@ -676,15 +914,17 @@ async function loadAll(){
   totalInv    = localGet(K_TOT) || semillaTotal();
   canastillas = localGet(K_CAN) || semillaCanastillas();
   movimientos = localGet(K_MOV) || [];
+  PINES       = localGet(K_PIN) || {};
 
-  const remotos = await Promise.all([cloudGet(K_IMP), cloudGet(K_TOT), cloudGet(K_CAN), cloudGet(K_MOV)]);
+  const remotos = await Promise.all([cloudGet(K_IMP), cloudGet(K_TOT), cloudGet(K_CAN), cloudGet(K_MOV), cloudGet(K_PIN)]);
   if(remotos.some(r=>r===undefined)){ setSync(false); } else { setSync(true); }
   if(remotos[0]) importacion = remotos[0];
   if(remotos[1]) totalInv = remotos[1];
   if(remotos[2]) canastillas = remotos[2];
   if(remotos[3]) movimientos = remotos[3];
+  if(remotos[4]) PINES = remotos[4];
 
-  localSet(K_IMP,importacion); localSet(K_TOT,totalInv); localSet(K_CAN,canastillas); localSet(K_MOV,movimientos);
+  localSet(K_IMP,importacion); localSet(K_TOT,totalInv); localSet(K_CAN,canastillas); localSet(K_MOV,movimientos); localSet(K_PIN,PINES);
   cloudSet(K_IMP,importacion); cloudSet(K_TOT,totalInv); cloudSet(K_CAN,canastillas);
 
   sincronizarImportacionATotal();
@@ -848,20 +1088,9 @@ function semillaCanastillas(){
 }
 
 /* ---------------- TABS ---------------- */
-const TITULOS = {dashboard:'Panel general', importacion:'Importación', total:'Inventario Total', canastillas:'Canastillas', mapa:'Mapa Almacén 5', comercial:'Comercial', verificacion:'Verificación de Conteo', movimientos:'Entradas / Salidas'};
-document.querySelectorAll('.sb-nav .sb-item').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.sb-nav .sb-item').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    const tab = btn.dataset.tab;
-    document.getElementById('topbarTitle').textContent = TITULOS[tab];
-    ['dashboard','importacion','total','canastillas','mapa','comercial','verificacion','movimientos'].forEach(t=>{
-      document.getElementById('tab-'+t).style.display = (t===tab) ? 'block' : 'none';
-    });
-    if(tab==='mapa') dibujarMapa();
-    if(tab==='verificacion') renderVerificacion();
-    if(tab==='comercial') renderComercial();
-  });
+const TITULOS = {dashboard:'Panel general', importacion:'Importación', total:'Inventario Total', canastillas:'Canastillas', mapa:'Mapa Almacén 5', bodegas:'Distribución de Bodegas', comercial:'Comercial', verificacion:'Verificación de Conteo', movimientos:'Entradas / Salidas'};
+document.querySelectorAll('.sb-nav .sb-item[data-tab]').forEach(btn=>{
+  btn.addEventListener('click', ()=> cambiarTab(btn.dataset.tab));
 });
 
 /* ---------------- BARCODE / QR ---------------- */
@@ -1019,10 +1248,10 @@ function abrirModalImportacion(id){
     document.getElementById('tImp').textContent='Editar producto — Importación';
     document.getElementById('impSku').value=p.sku; document.getElementById('impBod').value=p.bod;
     document.getElementById('impDesc').value=p.desc; document.getElementById('impSaldo').value=p.saldo;
-    document.getElementById('impCanast').value=(p.canastillas||[]).join(', ');
+    document.getElementById('impCanast').value=(p.canastillas||[]).join(', '); document.getElementById('impUmbral').value=p.umbral||'';
   } else {
     document.getElementById('tImp').textContent='Nuevo producto — Importación';
-    ['impSku','impBod','impDesc','impSaldo','impCanast'].forEach(f=>document.getElementById(f).value='');
+    ['impSku','impBod','impDesc','impSaldo','impCanast','impUmbral'].forEach(f=>document.getElementById(f).value='');
   }
   document.getElementById('modalImportacion').classList.add('open');
 }
@@ -1033,14 +1262,15 @@ function guardarImportacion(){
   const saldo=parseFloat(document.getElementById('impSaldo').value)||0;
   let sku=document.getElementById('impSku').value.trim();
   const canast=document.getElementById('impCanast').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const umbral=parseFloat(document.getElementById('impUmbral').value)||0;
   if(!desc){toast('Escribe una descripción');return;}
   if(id){
     const p=importacion.find(x=>x.id===id);
-    p.sku=sku||p.sku; p.bod=bod; p.desc=desc; p.saldo=saldo; p.canastillas=canast; p.actualizado=new Date().toISOString();
+    p.sku=sku||p.sku; p.bod=bod; p.desc=desc; p.saldo=saldo; p.canastillas=canast; p.umbral=umbral; p.actualizado=new Date().toISOString();
     toast('Producto actualizado');
   } else {
     if(!sku) sku=generarSkuUnico(desc, importacion.map(x=>x.sku));
-    importacion.push({id:'imp'+Date.now(), sku, bod, desc, saldo, canastillas:canast, actualizado:new Date().toISOString()});
+    importacion.push({id:'imp'+Date.now(), sku, bod, desc, saldo, canastillas:canast, umbral, actualizado:new Date().toISOString()});
     toast('Producto agregado');
   }
   saveImportacion();
@@ -1107,9 +1337,10 @@ function abrirModalTotal(id){
     document.getElementById('totSku').value=p.sku; document.getElementById('totDesc').value=p.desc;
     document.getElementById('totSistema').value=p.sistema; document.getElementById('totContado').value=p.contado;
     document.getElementById('totContadoPor').value=p.contadoPor||''; document.getElementById('totCanast').value=(p.canastillas||[]).join(', ');
+    document.getElementById('totUmbral').value=p.umbral||'';
   } else {
     document.getElementById('tTot').textContent='Nuevo producto — Inventario Total';
-    ['totSku','totDesc','totSistema','totContado','totContadoPor','totCanast'].forEach(f=>document.getElementById(f).value='');
+    ['totSku','totDesc','totSistema','totContado','totContadoPor','totCanast','totUmbral'].forEach(f=>document.getElementById(f).value='');
   }
   document.getElementById('modalTotal').classList.add('open');
 }
@@ -1121,16 +1352,17 @@ function guardarTotal(){
   const contadoPor=document.getElementById('totContadoPor').value.trim();
   let sku=document.getElementById('totSku').value.trim();
   const canast=document.getElementById('totCanast').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const umbral=parseFloat(document.getElementById('totUmbral').value)||0;
   if(!desc){toast('Escribe una descripción');return;}
   const now=new Date().toISOString();
   if(id){
     const p=totalInv.find(x=>x.id===id);
     p.sku=sku||p.sku; p.desc=desc; p.sistema=sistema; p.contado=contado; p.contadoPor=contadoPor;
-    p.fechaConteo=now; p.canastillas=canast; p.actualizado=now;
+    p.fechaConteo=now; p.canastillas=canast; p.umbral=umbral; p.actualizado=now;
     toast('Producto actualizado');
   } else {
     if(!sku) sku=generarSkuUnico(desc, totalInv.map(x=>x.sku));
-    totalInv.push({id:'tot'+Date.now(), sku, desc, sistema, contado, contadoPor, fechaConteo: contadoPor?now:'', canastillas:canast, actualizado:now});
+    totalInv.push({id:'tot'+Date.now(), sku, desc, sistema, contado, contadoPor, fechaConteo: contadoPor?now:'', canastillas:canast, umbral, actualizado:now});
     toast('Producto agregado');
   }
   saveTotal();
@@ -1205,6 +1437,47 @@ function eliminarCanastilla(id){
   if(!confirm('¿Eliminar esta canastilla?')) return;
   canastillas=canastillas.filter(c=>c.id!==id);
   saveCanastillas(); toast('Eliminada');
+}
+
+/* ---------------- DISTRIBUCIÓN DE BODEGAS ---------------- */
+function renderBodegas(){
+  const filter=(document.getElementById('searchBodegas').value||'').toLowerCase();
+  const resumen=document.getElementById('resumenBodegas');
+  const grupos={};
+  importacion.forEach(p=>{ const b=p.bod||'Sin bodega'; if(!grupos[b]) grupos[b]={refs:0,unid:0}; grupos[b].refs++; grupos[b].unid+=(p.saldo||0); });
+  resumen.innerHTML = Object.keys(grupos).sort().map(b=>`<div class="stat"><div class="num">${fmtNum(grupos[b].unid)}</div><div class="lbl">Bodega ${b} · ${grupos[b].refs} ref.</div></div>`).join('') || '<div class="hint">Sin productos de importación aún.</div>';
+
+  const tbody=document.getElementById('tablaBodegas');
+  const list=importacion.filter(p=>!filter || p.sku.toLowerCase().includes(filter) || p.desc.toLowerCase().includes(filter));
+  document.getElementById('bodegasEmpty').style.display = list.length ? 'none':'block';
+  tbody.innerHTML = list.map(p=>`
+    <tr>
+      <td><input type="checkbox" class="chkBodega" value="${p.id}"></td>
+      <td class="sku">${p.sku}</td>
+      <td><span class="tag-pill">${p.bod}</span></td>
+      <td>${p.desc}</td>
+      <td>${fmtNum(p.saldo)}</td>
+    </tr>`).join('');
+}
+function toggleTodosBodegas(chk){
+  document.querySelectorAll('.chkBodega').forEach(c=>c.checked=chk.checked);
+}
+function moverSeleccionADestino(){
+  const seleccionados=[...document.querySelectorAll('.chkBodega:checked')].map(c=>c.value);
+  if(!seleccionados.length){ toast('Selecciona al menos un producto'); return; }
+  let destino=document.getElementById('bodDestino').value;
+  if(destino==='__otra'){
+    destino=prompt('Nombre de la nueva bodega:','');
+    if(!destino) return;
+    destino=destino.trim();
+  }
+  seleccionados.forEach(id=>{
+    const p=importacion.find(x=>x.id===id);
+    if(p){ p.bod=destino; p.actualizado=new Date().toISOString(); }
+  });
+  saveImportacion();
+  renderBodegas();
+  toast(seleccionados.length+' producto(s) movidos a Bodega '+destino);
 }
 
 /* ---------------- BUSCADOR DE UBICACIÓN ---------------- */
@@ -1313,10 +1586,31 @@ function buscarProductoGlobal(query){
   const all=[...importacion, ...totalInv];
   return all.find(p=>p.sku.toLowerCase()===query) || all.find(p=>(p.sku+' — '+p.desc).toLowerCase()===query) || all.find(p=>p.desc.toLowerCase()===query);
 }
+function actualizarFiltroResponsables(){
+  const sel=document.getElementById('filterResponsableMov'); if(!sel) return;
+  const actuales=[...new Set(movimientos.map(m=>m.responsable).filter(Boolean))].sort();
+  const valActual=sel.value;
+  sel.innerHTML='<option value="">Todos los responsables</option>'+actuales.map(r=>`<option value="${r}">${r}</option>`).join('');
+  sel.value=valActual;
+}
+function renderResumenActividadPersona(){
+  const cont=document.getElementById('resumenActividadPersona'); if(!cont) return;
+  const desde = Date.now() - 7*24*60*60*1000;
+  const nombres = Object.values(PERFILES).filter(p=>p.rol!=='comercial').map(p=>p.nombre);
+  cont.innerHTML = nombres.map(n=>{
+    const propios = movimientos.filter(m=>m.responsable===n && new Date(m.fecha).getTime()>=desde);
+    const entradas = propios.filter(m=>m.tipo==='entrada').length;
+    const salidas = propios.filter(m=>m.tipo==='salida').length;
+    return `<div class="stat"><div class="num">${entradas+salidas}</div><div class="lbl">${n} · ${entradas} entr. / ${salidas} sal.</div></div>`;
+  }).join('');
+}
 function renderMovimientos(filter){
   filter=(filter!==undefined?filter:document.getElementById('searchMov').value||'').toLowerCase();
+  const respFilter=document.getElementById('filterResponsableMov')?document.getElementById('filterResponsableMov').value:'';
+  actualizarFiltroResponsables();
+  renderResumenActividadPersona();
   const tbody=document.getElementById('tablaMovimientos');
-  const list=movimientos.filter(m=>!filter || m.sku.toLowerCase().includes(filter) || m.desc.toLowerCase().includes(filter) || (m.obs||'').toLowerCase().includes(filter) || (m.proveedor||'').toLowerCase().includes(filter) || (m.guia||'').toLowerCase().includes(filter)).slice().reverse();
+  const list=movimientos.filter(m=>(!filter || m.sku.toLowerCase().includes(filter) || m.desc.toLowerCase().includes(filter) || (m.obs||'').toLowerCase().includes(filter) || (m.proveedor||'').toLowerCase().includes(filter) || (m.guia||'').toLowerCase().includes(filter)) && (!respFilter || m.responsable===respFilter)).slice().reverse();
   tbody.innerHTML=''; document.getElementById('movEmpty').style.display=list.length?'none':'block';
   list.forEach(m=>{
     const color=m.tipo==='entrada'?'var(--verde)':'var(--rojo)'; const sign=m.tipo==='entrada'?'+':'−';
@@ -1336,6 +1630,7 @@ function abrirModalMovimiento(tipo){
   document.getElementById('movTipo').value=tipo;
   document.getElementById('tMov').textContent = tipo==='entrada'?'Registrar entrada':'Registrar salida';
   ['movProducto','movCantidad','movGuia','movResponsable','movProveedor','movObs'].forEach(f=>document.getElementById(f).value='');
+  if(SESION){ document.getElementById('movResponsable').value = SESION.nombre; document.getElementById('movResponsable').disabled = true; }
   document.getElementById('modalMovimiento').classList.add('open');
 }
 function guardarMovimiento(){
@@ -1358,6 +1653,17 @@ function guardarMovimiento(){
   renderImportacion(); renderTotal(); renderMovimientos();
   cerrarModal('modalMovimiento');
   toast((tipo==='entrada'?'Entrada':'Salida')+' registrada');
+}
+function generarReporte(tipo){
+  const ahora = new Date();
+  let desde;
+  if(tipo==='dia'){ desde = new Date(ahora.getFullYear(),ahora.getMonth(),ahora.getDate()).getTime(); }
+  else { desde = ahora.getTime() - 7*24*60*60*1000; }
+  const filas = movimientos.filter(m=>new Date(m.fecha).getTime()>=desde);
+  if(!filas.length){ toast('No hay movimientos en ese período todavía'); return; }
+  const data = filas.map(m=>({FECHA:fmtFecha(m.fecha),TIPO:m.tipo==='entrada'?'Entrada':'Salida',SKU:m.sku,DESCRIPCION:m.desc,CANTIDAD:m.cantidad,RESPONSABLE:m.responsable||'',PROVEEDOR:m.proveedor||'',NUM_GUIA:m.guia||'',OBSERVACION:m.obs||''}));
+  exportarExcelGenerico(data, tipo==='dia'?'JD_Reporte_Hoy':'JD_Reporte_Semana');
+  toast('Reporte generado: '+filas.length+' movimiento(s)');
 }
 function eliminarMovimiento(id){
   if(!confirm('¿Eliminar este movimiento del historial? (no revierte el saldo)')) return;
@@ -1382,6 +1688,18 @@ function renderDashboard(){
   const circleEl = document.getElementById('circleProgress');
   if(circleEl){ circleEl.setAttribute('stroke-dasharray', circ.toFixed(1)); circleEl.setAttribute('stroke-dashoffset', (circ*(1-pct/100)).toFixed(1)); }
   document.getElementById('circleProgressText').textContent = pct+'%';
+
+  const bajos = [...importacion.map(p=>({p,stock:p.saldo||0,origen:'Importación'})), ...totalInv.map(p=>({p,stock:(p.contado||p.sistema||0),origen:'Inventario Total'}))]
+    .filter(x=>x.p.umbral>0 && x.stock<=x.p.umbral);
+  const contBajos = document.getElementById('listaStockBajo');
+  if(!bajos.length){ contBajos.innerHTML='<div class="hint">Todo por encima de su alerta configurada.</div>'; }
+  else {
+    contBajos.innerHTML = bajos.map(x=>`
+      <div style="display:flex;justify-content:space-between;padding:7px 0;border-top:1px dashed var(--borde);font-size:12.5px;">
+        <span><span class="sku">${x.p.sku}</span> — ${x.p.desc} <span style="color:var(--tenue);">(${x.origen})</span></span>
+        <span style="color:var(--rojo);font-weight:700;">${fmtNum(x.stock)} / alerta ${fmtNum(x.p.umbral)}</span>
+      </div>`).join('');
+  }
 
   const cont = document.getElementById('actividadReciente');
   const recientes = movimientos.slice().reverse().slice(0,8);
@@ -1448,16 +1766,21 @@ function generarQRComercial(){
   new QRCode(qrDiv, {text: urlComercial, width:170, height:170});
 }
 function revisarVistaComercialURL(){
+  // Link público de solo lectura (sin necesidad de iniciar sesión) — para compartir con clientes externos.
   const params = new URLSearchParams(window.location.search);
   if(params.get('vista')==='comercial'){
+    document.body.classList.remove('sin-sesion');
+    document.getElementById('sidebar').style.display='none';
+    document.getElementById('asistenteBtn').style.display='none';
     document.querySelectorAll('.sb-nav .sb-item').forEach(b=>b.classList.remove('active'));
-    document.querySelector('.sb-nav .sb-item[data-tab="comercial"]').classList.add('active');
     document.getElementById('topbarTitle').textContent = TITULOS.comercial;
-    ['dashboard','importacion','total','canastillas','mapa','comercial','verificacion','movimientos'].forEach(t=>{
+    TABS_TOTALES.forEach(t=>{
       document.getElementById('tab-'+t).style.display = (t==='comercial') ? 'block' : 'none';
     });
     renderComercial();
+    return true;
   }
+  return false;
 }
 document.getElementById('searchComercial').addEventListener('input', ()=>renderComercial());
 
@@ -1641,6 +1964,10 @@ function abrirFichaRapidaPorSku(sku){
   }
   ['frCantidad','frResponsable','frProveedor','frGuia','frObs'].forEach(f=>document.getElementById(f).value='');
   document.getElementById('frTipo').value='entrada';
+  const esComercial = SESION && SESION.rol==='comercial';
+  document.querySelectorAll('#modalFichaRapida .field, #modalFichaRapida .field-row').forEach(el=>el.style.display = esComercial ? 'none' : '');
+  document.querySelector('#modalFichaRapida .modal-actions .btn-primary').style.display = esComercial ? 'none' : '';
+  if(SESION && !esComercial){ document.getElementById('frResponsable').value = SESION.nombre; document.getElementById('frResponsable').disabled = true; }
   document.getElementById('modalFichaRapida').classList.add('open');
 }
 function guardarMovimientoRapido(){
@@ -1666,11 +1993,85 @@ function guardarMovimientoRapido(){
   abrirFichaRapidaPorSku(sku); // refresca el saldo mostrado para poder seguir registrando
   ['frCantidad','frObs'].forEach(f=>document.getElementById(f).value='');
 }
-function revisarParametroQR(){
-  const params = new URLSearchParams(window.location.search);
-  const sku = params.get('sku');
-  if(sku) abrirFichaRapidaPorSku(sku);
+/* ---------------- ESCÁNER CON CÁMARA ---------------- */
+let scannerStream=null, scannerLoopId=null;
+async function abrirEscaner(){
+  document.getElementById('modalEscaner').classList.add('open');
+  document.getElementById('scannerHint').textContent='Apunta la cámara al QR o código de barras del producto.';
+  try{
+    scannerStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const video = document.getElementById('scannerVideo');
+    video.srcObject = scannerStream;
+    await video.play();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const tick = ()=>{
+      if(!scannerStream) return;
+      if(video.readyState===video.HAVE_ENOUGH_DATA){
+        canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+        const code = (typeof jsQR==='function') ? jsQR(img.data, img.width, img.height) : null;
+        if(code && code.data){
+          let valor = code.data;
+          try{ const u=new URL(valor); const skuParam=u.searchParams.get('sku'); if(skuParam) valor=skuParam; }catch(e){ /* no era una URL, se usa tal cual como SKU */ }
+          cerrarEscaner();
+          abrirFichaRapidaPorSku(valor);
+          return;
+        }
+      }
+      scannerLoopId = requestAnimationFrame(tick);
+    };
+    scannerLoopId = requestAnimationFrame(tick);
+  }catch(e){
+    document.getElementById('scannerHint').textContent='No se pudo abrir la cámara. Revisa los permisos del navegador.';
+  }
 }
+function cerrarEscaner(){
+  if(scannerLoopId) cancelAnimationFrame(scannerLoopId);
+  if(scannerStream){ scannerStream.getTracks().forEach(t=>t.stop()); scannerStream=null; }
+  cerrarModal('modalEscaner');
+}
+
+/* ---------------- ASISTENTE DE MATERIALES ---------------- */
+function toggleAsistente(){
+  const panel=document.getElementById('asistentePanel');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open') && !panel.dataset.iniciado){
+    panel.dataset.iniciado='1';
+    agregarMsgAsistente('bot','¡Hola'+(SESION?', '+SESION.nombre:'')+'! Pregúntame por el nombre o SKU de un material y te digo cuánto hay y en qué bodega o canastilla está. Ej: "¿dónde está el contactor 40A?"');
+  }
+}
+function agregarMsgAsistente(tipo, texto){
+  const body=document.getElementById('asistenteBody');
+  const div=document.createElement('div'); div.className='asis-msg '+tipo; div.innerHTML=texto;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+function preguntarAsistente(){
+  const input=document.getElementById('asistenteInput');
+  const q=input.value.trim();
+  if(!q) return;
+  agregarMsgAsistente('user', q);
+  input.value='';
+  const respuesta = responderAsistente(q);
+  setTimeout(()=>agregarMsgAsistente('bot', respuesta), 250);
+}
+function responderAsistente(q){
+  const limpio = q.toLowerCase()
+    .replace(/dónde está|donde esta|dónde|donde|está|esta|el|la|los|las|un|una|de|cuánto hay|cuanto hay|cuánto|cuanto|hay|\?|¿/g,' ')
+    .replace(/\s+/g,' ').trim();
+  if(!limpio) return 'Escribe el nombre o SKU del material que buscas.';
+  const all = [...importacion.map(p=>({...p,origen:'Importación'})), ...totalInv.map(p=>({...p,origen:'Inventario Total'}))];
+  const matches = all.filter(p=>p.sku.toLowerCase().includes(limpio) || p.desc.toLowerCase().includes(limpio));
+  if(!matches.length) return 'No encontré ningún material que coincida con "'+q+'". Intenta con otra palabra o el SKU exacto.';
+  return matches.slice(0,5).map(p=>{
+    const stock = p.origen==='Importación' ? p.saldo : (p.contado||p.sistema||0);
+    const bodegaTxt = p.origen==='Importación' ? ' · Bodega '+p.bod : '';
+    return `<b>${p.desc}</b> (${p.sku})<br>Disponible: ${fmtNum(stock)}${bodegaTxt}<br>📍 ${ubicacionTextoDeProducto(p)}`;
+  }).join('<hr style="border-color:var(--borde);opacity:.3;margin:8px 0;">');
+}
+document.getElementById('asistenteBtn').style.display='none'; // se muestra al iniciar sesión (perfiles internos)
 
 /* ---------------- INIT ---------------- */
 function aplicarCodigoDesdeURL(){
@@ -1682,7 +2083,15 @@ function aplicarCodigoDesdeURL(){
   }
 }
 aplicarCodigoDesdeURL();
-loadAll().then(()=>{ revisarParametroQR(); revisarVistaComercialURL(); });
+pintarPerfiles();
+let PENDING_SKU = new URLSearchParams(window.location.search).get('sku') || null;
+loadAll().then(()=>{
+  const esVistaPublica = revisarVistaComercialURL();
+  if(!esVistaPublica){
+    aplicarSesion(); // muestra el login si no hay sesión guardada en este dispositivo
+    if(SESION && PENDING_SKU){ abrirFichaRapidaPorSku(PENDING_SKU); PENDING_SKU=null; }
+  }
+});
 if(!CLOUD_BUCKET){
   setTimeout(()=>{ toast('Activa la sincronización en la nube desde ⚙️ en el menú'); }, 1200);
 }
