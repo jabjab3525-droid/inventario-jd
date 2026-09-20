@@ -676,14 +676,20 @@
       </select></div>
     <div class="field"><label>Contado por (opcional)</label><input id="icContadoPor" placeholder="Vacío = columna “Contado por” del archivo o tu nombre"></div>
   </div>
+  <div class="field-row">
+    <div class="field" id="icGenWrap" style="display:none"><label>La columna “Cantidad / Existencia” del archivo es…</label>
+      <select id="icGenerico" onchange="icRender()"><option value="conteo">El conteo físico (lo que contamos)</option><option value="sistema">El inventario del sistema (lo que dice el programa)</option></select></div>
+    <div class="field" id="icSisWrap" style="display:none"><label>Inventario del sistema</label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--texto);text-transform:none;letter-spacing:0;font-weight:500;cursor:pointer;"><input type="checkbox" id="icActSistema" checked onchange="icRender()" style="width:auto;"> Cambiar también el Inv. Sistema con lo que diga el archivo</label></div>
+  </div>
   <div style="overflow:auto;max-height:44vh;border:1px solid var(--borde);border-radius:8px;">
     <table>
       <thead><tr><th style="width:34px;"></th><th style="width:110px;">Estado</th><th>Material</th><th style="width:80px;">Sistema</th><th style="width:90px;">Conteo actual</th><th style="width:90px;">Conteo nuevo</th><th style="width:110px;">Diferencia</th></tr></thead>
       <tbody id="icTabla"></tbody>
     </table>
   </div>
-  <div class="hint">Las diferencias se calculan solas contra el Inv. Sistema. Los “Aproximado” y “No existe” vienen sin marcar: revísalos y márcalos si aplican.</div>
-  <div class="modal-actions"><button class="btn btn-ghost" onclick="cerrarModal('modalImportConteo')">Cancelar</button><button class="btn btn-primary" id="icAplicar" onclick="icAplicar()">Aplicar conteo</button></div>
+  <div class="hint">Las diferencias se calculan solas contra el Inv. Sistema. “Sumar” aplica solo al conteo; el Inv. Sistema siempre queda igual a lo que diga el archivo. Los “Aproximado” y “No existe” vienen sin marcar: revísalos y márcalos si aplican.</div>
+  <div class="modal-actions"><button class="btn btn-ghost" onclick="cerrarModal('modalImportConteo')">Cancelar</button><button class="btn btn-primary" id="icAplicar" onclick="icAplicar()">Aplicar</button></div>
 </div></div>
 
 <input type="file" id="inputFoto" accept="image/*" style="display:none" onchange="fotoElegida(event)">
@@ -2183,8 +2189,9 @@ let IC = { grupos:[], archivo:'', filasLeidas:0, sinEncabezado:false };
 const IC_ALIAS = {
   sku:['SKU','CODIGO','COD','CODIGOPRODUCTO','CODIGOSKU','REFERENCIA','REF'],
   desc:['DESCRIPCION','DESCRIP','PRODUCTO','MATERIAL','NOMBRE','ARTICULO','DETALLE','DESCRIPCIONPRODUCTO'],
-  contado:['INVCONTADO','INVENTARIOCONTADO','CONTADO','CONTEO','CONTEOFISICO','FISICO','INVFISICO','CANTIDADCONTADA','CANTIDADFISICA','CANTIDAD','CANT','EXISTENCIA','UNIDADES'],
-  sistema:['INVSISTEMA','INVENTARIOSISTEMA','SISTEMA','SALDO','STOCK'],
+  contado:['INVCONTADO','INVENTARIOCONTADO','CONTADO','CONTEO','CONTEOFISICO','FISICO','INVFISICO','CANTIDADCONTADA','CANTIDADFISICA'],
+  sistema:['INVSISTEMA','INVENTARIOSISTEMA','SISTEMA','CANTIDADSISTEMA','EXISTENCIASISTEMA','SALDO','STOCK'],
+  gen:['CANTIDAD','CANT','EXISTENCIA','EXISTENCIAS','UNIDADES'],   // ambiguas: el usuario elige si es conteo o sistema
   por:['CONTADOPOR','RESPONSABLE','CONTADOR'],
   canast:['CANASTILLAS','CANASTILLA','UBICACION']
 };
@@ -2273,7 +2280,7 @@ function icBuscarEncabezado(m){
     const cel=(m[i]||[]).map(icNorm);
     const idx={};
     Object.keys(IC_ALIAS).forEach(k=>{ let f=-1; for(const a of IC_ALIAS[k]){ const j=cel.indexOf(a); if(j>=0){ f=j; break; } } idx[k]=f; });
-    if(idx.contado>=0 && (idx.desc>=0||idx.sku>=0)) return {fila:i, idx};
+    if((idx.contado>=0||idx.sistema>=0||idx.gen>=0) && (idx.desc>=0||idx.sku>=0)) return {fila:i, idx};
   }
   return null;
 }
@@ -2282,16 +2289,18 @@ function icFilasDesdeMatriz(m){
   const out=[];
   if(enc){
     const {fila,idx}=enc;
+    const usaGen = idx.contado<0 && idx.sistema<0 && idx.gen>=0; // solo hay una columna "Cantidad/Existencia"
     for(let i=fila+1;i<m.length;i++){
       const r=m[i]||[];
       const sku = idx.sku>=0 ? String(r[idx.sku]==null?'':r[idx.sku]).trim() : '';
       const desc = idx.desc>=0 ? String(r[idx.desc]==null?'':r[idx.desc]).trim() : '';
-      const cont = parseNumES(r[idx.contado]);
-      if((!sku && !desc) || cont===null) continue;
+      const cont = idx.contado>=0 ? parseNumES(r[idx.contado]) : null;
+      const sis  = idx.sistema>=0 ? parseNumES(r[idx.sistema]) : null;
+      const gen  = usaGen ? parseNumES(r[idx.gen]) : null;
+      if((!sku && !desc) || (cont===null && sis===null && gen===null)) continue;
       if(/^TOTAL(ES)?$/.test(icNorm(desc||sku))) continue;
       out.push({
-        sku, desc, contado:cont,
-        sistema: idx.sistema>=0 ? parseNumES(r[idx.sistema]) : null,
+        sku, desc, cont, sis, gen,
         por: idx.por>=0 ? String(r[idx.por]==null?'':r[idx.por]).trim() : '',
         canast: idx.canast>=0 ? String(r[idx.canast]==null?'':r[idx.canast]).split(',').map(normCodigoCanastilla).filter(Boolean) : []
       });
@@ -2302,15 +2311,15 @@ function icFilasDesdeMatriz(m){
   for(let i=0;i<m.length;i++){
     const celdas=(m[i]||[]).map(c=>String(c==null?'':c).trim()).filter(Boolean);
     if(celdas.length<2) continue;
-    const cont=parseNumES(celdas[celdas.length-1]);
-    if(cont===null) continue;
+    const gen=parseNumES(celdas[celdas.length-1]);
+    if(gen===null) continue;
     let resto=celdas.slice(0,-1);
     if(resto.length>=2 && /^\d{1,4}$/.test(resto[0])) resto=resto.slice(1); // número de línea
     let sku='';
     if(resto.length>=2 && totalInv.some(t=>t.sku.toUpperCase()===resto[0].toUpperCase())){ sku=resto[0]; resto=resto.slice(1); }
     const desc=resto.join(' ').trim();
     if(!/[A-Za-z]/.test(desc||sku)) continue;
-    out.push({sku, desc, contado:cont, sistema:null, por:'', canast:[]});
+    out.push({sku, desc, cont:null, sis:null, gen, por:'', canast:[]});
   }
   return {filas:out, sinEncabezado:true};
 }
@@ -2328,18 +2337,18 @@ function icEncontrar(sku, desc){
 }
 function icEmparejar(filas){
   const grupos=new Map();
+  const suma=(a,b)=> b==null ? a : (a==null ? b : a+b);
   filas.forEach(f=>{
     const hit=icEncontrar(f.sku,f.desc);
     const key = hit ? 'p:'+hit.p.id : 'n:'+(txtPlano(f.desc)||f.sku);
     let g=grupos.get(key);
     if(!g){
-      g={p:hit?hit.p:null, tipo:hit?hit.tipo:'nuevo', sku:f.sku, desc:f.desc, cantidad:0, filas:0, por:'', canast:new Set(), sistemaArchivo:null, aplicar:!!hit && hit.tipo==='exacto'};
+      g={p:hit?hit.p:null, tipo:hit?hit.tipo:'nuevo', sku:f.sku, desc:f.desc, cont:null, sis:null, gen:null, filas:0, por:'', canast:new Set(), aplicar:!!hit && hit.tipo==='exacto'};
       grupos.set(key,g);
     }
-    g.cantidad+=f.contado; g.filas++;
+    g.cont=suma(g.cont,f.cont); g.sis=suma(g.sis,f.sis); g.gen=suma(g.gen,f.gen); g.filas++;
     if(f.por) g.por=f.por;
     f.canast.forEach(c=>g.canast.add(c));
-    if(f.sistema!=null) g.sistemaArchivo=(g.sistemaArchivo||0)+f.sistema;
   });
   return [...grupos.values()];
 }
@@ -2359,6 +2368,8 @@ function abrirImportadorConteo(evt){
       if(!filas.length){ toast('No encontré filas con cantidades. El archivo necesita columnas como Descripción (o SKU) y Conteo.'); return; }
       IC={grupos:icEmparejar(filas), archivo:nombre, filasLeidas:filas.length, sinEncabezado};
       document.getElementById('icContadoPor').value = '';
+      document.getElementById('icGenerico').value = 'conteo';
+      document.getElementById('icActSistema').checked = true;
       icRender();
       document.getElementById('modalImportConteo').classList.add('open');
     }catch(err){
@@ -2368,35 +2379,68 @@ function abrirImportadorConteo(evt){
   };
   reader.readAsArrayBuffer(file);
 }
-function icNuevoConteo(g, modo){ return (modo==='sumar' && g.p) ? ((g.p.contado||0)+g.cantidad) : g.cantidad; }
+/* Qué trae el archivo para cada material, según cómo se interprete la columna "Cantidad/Existencia" */
+function icValores(g){
+  const como=document.getElementById('icGenerico').value;
+  return { cont: g.cont!=null ? g.cont : (como==='conteo' ? g.gen : null),
+           sis:  g.sis!=null  ? g.sis  : (como==='sistema' ? g.gen : null) };
+}
+function icBodegasDe(p){ return p ? importacion.filter(x=>normDesc(x.desc)===normDesc(p.desc)) : []; }
+/* Deja el Inv. Sistema del producto en "nuevo". El sistema se calcula desde el saldo de Importación,
+   así que si el producto está ahí se ajusta el saldo de su bodega (si hay varias, la diferencia va a la primera). */
+function icAplicarSistema(p, nuevo, ahora){
+  const imps=icBodegasDe(p);
+  if(imps.length){
+    const actual=imps.reduce((a,x)=>a+(x.saldo||0),0);
+    if(actual===nuevo) return false;
+    imps[0].saldo=(imps[0].saldo||0)+(nuevo-actual); imps[0].actualizado=ahora; return true;
+  }
+  if((p.sistema||0)===nuevo) return false;
+  p.sistema=nuevo; p.actualizado=ahora; return true;
+}
 function icRender(){
   const modo=document.getElementById('icModo').value;
-  let nEx=0,nAp=0,nNu=0;
+  const hayGen=IC.grupos.some(g=>g.gen!=null && g.cont==null && g.sis==null);
+  document.getElementById('icGenWrap').style.display = hayGen ? '' : 'none';
+  const haySis=IC.grupos.some(g=>icValores(g).sis!=null);
+  document.getElementById('icSisWrap').style.display = haySis ? '' : 'none';
+  const actSis=haySis && document.getElementById('icActSistema').checked;
+  let nEx=0,nAp=0,nNu=0,nSis=0;
   document.getElementById('icTabla').innerHTML = IC.grupos.map((g,i)=>{
     if(g.tipo==='exacto') nEx++; else if(g.tipo==='aprox') nAp++; else nNu++;
-    const sis = g.p ? (g.p.sistema||0) : (g.sistemaArchivo||0);
-    const actual = (g.p && !sinConteo(g.p)) ? fmtNum(g.p.contado) : '<span style="color:var(--tenue)">—</span>';
-    const nuevo = icNuevoConteo(g,modo);
-    const diff = nuevo - sis;
-    const cls = diff>0?'pos-sobra':diff<0?'pos-falta':'pos-ok';
+    const v=icValores(g);
+    const sisAct = g.p ? (g.p.sistema||0) : 0;
+    const sisNuevo = (actSis && v.sis!=null) ? v.sis : sisAct;
+    if(g.aplicar && sisNuevo!==sisAct) nSis++;
+    const conAct = (g.p && !sinConteo(g.p)) ? (g.p.contado||0) : null;
+    const conNuevo = v.cont!=null ? ((modo==='sumar' && g.p) ? (g.p.contado||0)+v.cont : v.cont) : conAct;
+    const diff = conNuevo!=null ? conNuevo-sisNuevo : null;
+    const cls = diff==null?'':(diff>0?'pos-sobra':diff<0?'pos-falta':'pos-ok');
     const tag = g.tipo==='exacto' ? '<span class="ic-tag ic-ok">Coincide</span>' : g.tipo==='aprox' ? '<span class="ic-tag ic-aprox">⚠ Aproximado</span>' : '<span class="ic-tag ic-nuevo">No existe</span>';
     const nombre = g.p ? esc(g.p.desc) : esc(g.desc||g.sku);
-    const nota = (g.tipo!=='exacto' ? `<div class="ic-archivo">En el archivo: ${esc(g.desc||g.sku)}</div>` : '') + (g.filas>1 ? `<div class="ic-archivo">${g.filas} filas sumadas</div>` : '');
+    const bods=icBodegasDe(g.p);
+    const nota = (g.tipo!=='exacto' ? `<div class="ic-archivo">En el archivo: ${esc(g.desc||g.sku)}</div>` : '')
+      + (g.filas>1 ? `<div class="ic-archivo">${g.filas} filas sumadas</div>` : '')
+      + (actSis && v.sis!=null && bods.length>1 && sisNuevo!==sisAct ? `<div class="ic-archivo">Está en ${bods.length} bodegas: la diferencia se aplica a la bodega ${esc(bods[0].bod)}</div>` : '');
+    const celdaSis = sisNuevo!==sisAct ? `${fmtNum(sisAct)} → <b style="color:var(--amarillo)">${fmtNum(sisNuevo)}</b>` : fmtNum(sisAct);
+    const celdaAct = conAct!=null ? fmtNum(conAct) : '<span style="color:var(--tenue)">—</span>';
+    const celdaNuevo = conNuevo!=null ? (v.cont!=null ? '<b>'+fmtNum(conNuevo)+'</b>' : fmtNum(conNuevo)) : '<span style="color:var(--tenue)">—</span>';
     return `<tr>
-      <td><input type="checkbox" ${g.aplicar?'checked':''} onchange="IC.grupos[${i}].aplicar=this.checked; icActualizarBoton();"></td>
+      <td><input type="checkbox" ${g.aplicar?'checked':''} onchange="IC.grupos[${i}].aplicar=this.checked; icRender();"></td>
       <td>${tag}</td>
       <td>${g.p?`<span class="sku">${esc(g.p.sku)}</span> — `:''}${nombre}${nota}</td>
-      <td>${fmtNum(sis)}</td><td>${actual}</td><td><b>${fmtNum(nuevo)}</b></td>
-      <td class="${cls}">${diff>0?'+':''}${fmtNum(diff)}</td></tr>`;
+      <td>${celdaSis}</td><td>${celdaAct}</td><td>${celdaNuevo}</td>
+      <td class="${cls}">${diff==null?'<span style="color:var(--tenue)">—</span>':(diff>0?'+':'')+fmtNum(diff)}</td></tr>`;
   }).join('');
   document.getElementById('icResumen').innerHTML =
     `📄 <b>${esc(IC.archivo)}</b>: ${IC.filasLeidas} filas leídas → <b>${nEx}</b> coinciden, <b>${nAp}</b> aproximados, <b>${nNu}</b> no existen en el catálogo.`
+    + (actSis ? `<br>🔄 Con lo marcado, el <b>Inv. Sistema cambia en ${nSis}</b> producto(s).` : '')
     + (IC.sinEncabezado ? `<br>⚠️ No encontré encabezados de columna; leí cada línea como “descripción … cantidad”. Revisa bien la tabla antes de aplicar.` : '');
   icActualizarBoton();
 }
 function icActualizarBoton(){
   const n=IC.grupos.filter(g=>g.aplicar).length;
-  const b=document.getElementById('icAplicar'); b.textContent='Aplicar conteo ('+n+')'; b.disabled=!n;
+  const b=document.getElementById('icAplicar'); b.textContent='Aplicar ('+n+')'; b.disabled=!n;
 }
 function icAplicar(){
   const sel=IC.grupos.filter(g=>g.aplicar);
@@ -2404,26 +2448,34 @@ function icAplicar(){
   const modo=document.getElementById('icModo').value;
   const por=document.getElementById('icContadoPor').value.trim();
   const now=new Date().toISOString();
-  localSet('jd3_undo_conteo', {fecha:now, totalInv, canastillas}); // copia para poder deshacer
-  let act=0, nue=0;
+  const actSis=IC.grupos.some(g=>icValores(g).sis!=null) && document.getElementById('icActSistema').checked;
+  localSet('jd3_undo_conteo', {fecha:now, totalInv, canastillas, importacion}); // copia para poder deshacer
+  let act=0, nue=0, nSis=0;
   sel.forEach(g=>{
+    const v=icValores(g);
     const quien = por || g.por || (SESION?SESION.nombre:'Importación');
-    const nuevo = icNuevoConteo(g,modo);
     if(g.p){
-      g.p.contado=nuevo; g.p.contadoPor=quien; g.p.fechaConteo=now; g.p.actualizado=now;
+      if(v.cont!=null){
+        g.p.contado = (modo==='sumar') ? (g.p.contado||0)+v.cont : v.cont;
+        g.p.contadoPor=quien; g.p.fechaConteo=now;
+      }
+      if(actSis && v.sis!=null && icAplicarSistema(g.p, v.sis, now)) nSis++;
       if(g.canast.size) g.p.canastillas=[...new Set([...(g.p.canastillas||[]),...g.canast])];
-      act++;
+      g.p.actualizado=now; act++;
     } else {
       let sku=g.sku && !totalInv.some(t=>t.sku.toUpperCase()===g.sku.toUpperCase()) ? g.sku : generarSkuUnico(g.desc||g.sku, totalInv.map(t=>t.sku));
-      totalInv.push({id:'tot'+Date.now()+Math.random().toString(36).slice(2,6), sku, desc:(g.desc||g.sku), sistema:g.sistemaArchivo||0, contado:nuevo, contadoPor:quien, fechaConteo:now, canastillas:[...g.canast], actualizado:now});
-      nue++;
+      const n={id:'tot'+Date.now()+Math.random().toString(36).slice(2,6), sku, desc:(g.desc||g.sku), sistema:(actSis&&v.sis!=null)?v.sis:0, contado:v.cont!=null?v.cont:0, canastillas:[...g.canast], actualizado:now};
+      if(v.cont!=null){ n.contadoPor=quien; n.fechaConteo=now; }
+      totalInv.push(n); nue++; if(actSis && v.sis!=null) nSis++;
     }
     g.canast.forEach(asegurarCanastilla);
   });
-  saveTotal(); saveCanastillas(); renderVerificacion();
+  sincronizarImportacionATotal();   // el Inv. Sistema se recalcula desde los saldos de Importación
+  if(nSis) saveImportacion(true);
+  saveTotal(); saveCanastillas(); renderImportacion(); renderVerificacion();
   cerrarModal('modalImportConteo');
   actualizarBotonDeshacer();
-  toast(`Conteo aplicado: ${act} actualizados${nue?`, ${nue} nuevos`:''}. Ya se guardó.`);
+  toast(`Listo: ${act} actualizados${nue?`, ${nue} nuevos`:''}${nSis?`, Inv. Sistema cambiado en ${nSis}`:''}. Ya se guardó.`);
 }
 function actualizarBotonDeshacer(){
   const b=document.getElementById('btnDeshacerImp'); if(!b) return;
@@ -2433,10 +2485,11 @@ function actualizarBotonDeshacer(){
 function deshacerImportacionConteo(){
   const snap=localGet('jd3_undo_conteo');
   if(!snap){ toast('No hay ninguna importación para deshacer'); actualizarBotonDeshacer(); return; }
-  if(!confirm('¿Deshacer la última importación de conteo? El Inventario Total y las Canastillas vuelven al estado de '+fmtFecha(snap.fecha)+'. Se pierde cualquier cambio hecho después de esa hora.')) return;
-  totalInv=snap.totalInv; canastillas=snap.canastillas;
+  if(!confirm('¿Deshacer la última importación de conteo? El Inventario Total, las Canastillas y los saldos de Importación vuelven al estado de '+fmtFecha(snap.fecha)+'. Se pierde cualquier cambio hecho después de esa hora.')) return;
+  totalInv=snap.totalInv; canastillas=snap.canastillas; if(snap.importacion) importacion=snap.importacion;
   try{ localStorage.removeItem('jd3_undo_conteo'); }catch(e){}
-  saveTotal(); saveCanastillas(); renderVerificacion(); actualizarBotonDeshacer();
+  if(snap.importacion) saveImportacion(true);
+  saveTotal(); saveCanastillas(); renderImportacion(); renderVerificacion(); actualizarBotonDeshacer();
   toast('Importación deshecha');
 }
 
