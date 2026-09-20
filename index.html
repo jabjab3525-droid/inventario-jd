@@ -222,7 +222,7 @@
 
   /* ---------- ASISTENTE IA ---------- */
   #asistenteBtn{position:fixed;bottom:24px;right:24px;z-index:150;width:56px;height:56px;border-radius:50%;background:var(--amarillo);color:var(--negro);border:none;font-size:24px;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.4);}
-  #asistentePanel{position:fixed;bottom:92px;right:24px;z-index:150;width:340px;max-width:calc(100vw - 32px);height:440px;max-height:70vh;background:var(--panel);border:1px solid var(--borde);border-top:4px solid var(--amarillo);border-radius:14px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.5);}
+  #asistentePanel{position:fixed;bottom:92px;right:24px;z-index:150;width:360px;max-width:calc(100vw - 32px);height:440px;max-height:70vh;background:var(--panel);border:1px solid var(--borde);border-top:4px solid var(--amarillo);border-radius:14px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.5);}
   #asistentePanel.open{display:flex;}
   .asis-head{padding:12px 14px;border-bottom:1px solid var(--borde);font-family:var(--font-d);font-weight:700;font-size:13px;color:var(--amarillo);display:flex;justify-content:space-between;align-items:center;}
   .asis-body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
@@ -236,6 +236,25 @@
   #scannerVideoWrap{background:#000;border-radius:10px;overflow:hidden;position:relative;}
   #scannerVideoWrap video{width:100%;display:block;}
   .scan-line{position:absolute;left:6%;right:6%;top:50%;height:2px;background:var(--amarillo);box-shadow:0 0 8px var(--amarillo);}
+
+  /* ---------- v4: guardar ahora, importar conteo, asistente con acciones ---------- */
+  #btnGuardarAhora{white-space:nowrap;}
+  .modal.wide{max-width:1000px;}
+  .ic-tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .ic-ok{background:rgba(51,193,122,.15);color:var(--verde);}
+  .ic-aprox{background:rgba(255,196,0,.15);color:var(--amarillo);}
+  .ic-nuevo{background:rgba(77,163,255,.15);color:var(--azul);}
+  .ic-archivo{font-size:10.5px;color:var(--tenue);margin-top:2px;}
+  .asis-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .asis-chip{background:var(--negro);border:1px solid var(--amarillo);color:var(--amarillo);padding:5px 10px;border-radius:999px;font-size:11.5px;cursor:pointer;font-family:inherit;text-align:left;}
+  .asis-chip:hover{background:var(--amarillo);color:var(--negro);}
+  .asis-chip.ok{border-color:var(--verde);color:var(--verde);} .asis-chip.ok:hover{background:var(--verde);color:#062713;}
+  .asis-chip.no{border-color:var(--rojo);color:var(--rojo);} .asis-chip.no:hover{background:var(--rojo);color:#fff;}
+  .asis-img{display:block;max-width:100%;max-height:170px;border-radius:8px;margin-top:8px;border:1px solid var(--borde);}
+  .asis-msg ul{margin:6px 0 0;padding-left:16px;}
+  #asisMic{background:var(--panel2);border:1.5px solid var(--borde);color:var(--texto);border-radius:8px;padding:0 10px;cursor:pointer;font-size:15px;}
+  #asisMic.mic-on{background:var(--rojo);color:#fff;border-color:var(--rojo);animation:micpulse 1s infinite;}
+  @keyframes micpulse{0%,100%{opacity:1}50%{opacity:.55}}
 </style>
 </head>
 <body class="sin-sesion">
@@ -277,6 +296,7 @@
     <h1 id="topbarTitle">Panel general</h1>
     <div class="top-right">
       <div class="user-pill">👤 <b id="userPillNombre">—</b></div>
+      <button class="btn btn-primary btn-sm" id="btnGuardarAhora" onclick="guardarAhora()" title="Guarda todo en este dispositivo y lo sube a la nube al instante (Ctrl+S)">💾 Guardar ahora</button>
       <div class="sync-pill"><span class="sync-dot" id="syncDot"></span><span id="syncText">Sincronizado</span></div>
       <div class="clock"><div class="hora" id="clockHora">--:--:--</div><div class="fecha" id="clockFecha">—</div></div>
     </div>
@@ -381,12 +401,13 @@
       <div class="search-box"><input type="text" id="searchTot" placeholder="Buscar por SKU o descripción..."></div>
       <button class="btn btn-primary" onclick="abrirModalTotal()">＋ Nuevo producto</button>
       <button class="btn btn-green" onclick="exportarExcelGenerico(totalInv.map(p=>({SKU:p.sku,DESCRIPCION:p.desc,INV_SISTEMA:p.sistema,INV_CONTADO:p.contado,DIFERENCIA:calcDiff(p).diff,DIFERENCIA_PORC:calcDiff(p).pct+'%',CONTADO_POR:p.contadoPor||'',FECHA_CONTEO:p.fechaConteo?fmtFecha(p.fechaConteo):'',CANASTILLAS:(p.canastillas||[]).join(', ')})),'JD_InventarioTotal')">⬇ Exportar Excel</button>
-      <button class="btn btn-ghost" onclick="document.getElementById('importFileTotal').click()">⬆ Importar Excel</button>
-      <input type="file" id="importFileTotal" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarExcelTotal(event)">
+      <button class="btn btn-primary" onclick="document.getElementById('importFileTotal').click()" title="Sube el Excel, CSV o PDF con el conteo físico: la app calcula sola las diferencias contra el sistema">⬆ Importar conteo (Excel / PDF)</button>
+      <input type="file" id="importFileTotal" accept=".xlsx,.xls,.csv,.pdf" style="display:none" onchange="abrirImportadorConteo(event)">
+      <button class="btn btn-ghost" id="btnDeshacerImp" style="display:none" onclick="deshacerImportacionConteo()">↩ Deshacer última importación</button>
     </div>
     <div style="overflow-x:auto;">
     <table>
-      <thead><tr><th style="width:110px;">SKU</th><th>Descripción</th><th style="width:100px;">Inv. Sistema</th><th style="width:100px;">Inv. Contado</th><th style="width:120px;">Diferencia</th><th style="width:110px;">Contado por</th><th style="width:130px;">Canastilla(s)</th><th style="width:100px;">Acciones</th></tr></thead>
+      <thead><tr><th style="width:110px;">SKU</th><th>Descripción</th><th style="width:100px;">Inv. Sistema</th><th style="width:100px;">Inv. Contado</th><th style="width:120px;">Diferencia</th><th style="width:110px;">Contado por</th><th style="width:130px;">Canastilla(s)</th><th style="width:135px;">Acciones</th></tr></thead>
       <tbody id="tablaTotal"></tbody>
     </table>
     </div>
@@ -644,12 +665,36 @@
   <div class="modal-actions"><button class="btn btn-ghost" onclick="cerrarEscaner()">Cerrar</button></div>
 </div></div>
 
+<div class="modal-bg" id="modalImportConteo"><div class="modal wide">
+  <h2>📥 Importar conteo desde archivo</h2>
+  <div class="hint" id="icResumen" style="margin:0 0 12px;font-size:12px;line-height:1.5;"></div>
+  <div class="field-row">
+    <div class="field"><label>¿Cómo aplicar las cantidades del archivo?</label>
+      <select id="icModo" onchange="icRender()">
+        <option value="reemplazar">Reemplazar el conteo (el archivo es el conteo real)</option>
+        <option value="sumar">Sumar al conteo que ya existe</option>
+      </select></div>
+    <div class="field"><label>Contado por (opcional)</label><input id="icContadoPor" placeholder="Vacío = columna “Contado por” del archivo o tu nombre"></div>
+  </div>
+  <div style="overflow:auto;max-height:44vh;border:1px solid var(--borde);border-radius:8px;">
+    <table>
+      <thead><tr><th style="width:34px;"></th><th style="width:110px;">Estado</th><th>Material</th><th style="width:80px;">Sistema</th><th style="width:90px;">Conteo actual</th><th style="width:90px;">Conteo nuevo</th><th style="width:110px;">Diferencia</th></tr></thead>
+      <tbody id="icTabla"></tbody>
+    </table>
+  </div>
+  <div class="hint">Las diferencias se calculan solas contra el Inv. Sistema. Los “Aproximado” y “No existe” vienen sin marcar: revísalos y márcalos si aplican.</div>
+  <div class="modal-actions"><button class="btn btn-ghost" onclick="cerrarModal('modalImportConteo')">Cancelar</button><button class="btn btn-primary" id="icAplicar" onclick="icAplicar()">Aplicar conteo</button></div>
+</div></div>
+
+<input type="file" id="inputFoto" accept="image/*" style="display:none" onchange="fotoElegida(event)">
+
 <button id="asistenteBtn" onclick="toggleAsistente()" title="Asistente de materiales">🤖</button>
 <div id="asistentePanel">
   <div class="asis-head"><span>🤖 Asistente de materiales</span><button class="btn btn-ghost btn-sm" onclick="toggleAsistente()">✕</button></div>
   <div class="asis-body" id="asistenteBody"></div>
   <div class="asis-foot">
-    <input type="text" id="asistenteInput" placeholder="Ej: ¿dónde está el contactor 40A?" onkeydown="if(event.key==='Enter')preguntarAsistente()">
+    <button id="asisMic" onclick="alternarMicrofono()" title="Hablarle al asistente">🎤</button>
+    <input type="text" id="asistenteInput" placeholder="Escribe o toca 🎤 y habla" onkeydown="if(event.key==='Enter')preguntarAsistente()">
     <button class="btn btn-primary btn-sm" onclick="preguntarAsistente()">➤</button>
   </div>
 </div>
@@ -733,6 +778,7 @@ function aplicarSesion(){
   });
   const btnCfg = document.getElementById('btnConfigNube'); if(btnCfg) btnCfg.style.display = esComercial ? 'none' : '';
   const asisBtn = document.getElementById('asistenteBtn'); if(asisBtn) asisBtn.style.display = esComercial ? 'none' : '';
+  const btnGA = document.getElementById('btnGuardarAhora'); if(btnGA) btnGA.style.display = esComercial ? 'none' : '';
   cambiarTab(esComercial ? 'comercial' : (document.querySelector('.sb-nav .sb-item.active')?.dataset.tab || 'dashboard'));
 }
 function cambiarTab(tab){
@@ -933,19 +979,58 @@ async function loadAll(){
   actualizarReloj();
 }
 async function saveImportacion(silent){
-  localSet(K_IMP,importacion); cloudSet(K_IMP,importacion).then(setSync);
+  localSet(K_IMP,importacion); subirNube(K_IMP,importacion);
   sincronizarImportacionATotal(); publicarFichasQR();
   if(!silent){renderImportacion(); renderStatsImp(); renderDashboard();}
 }
 async function saveTotal(silent){
-  localSet(K_TOT,totalInv); cloudSet(K_TOT,totalInv).then(setSync); publicarFichasQR();
+  localSet(K_TOT,totalInv); subirNube(K_TOT,totalInv); publicarFichasQR();
   if(!silent){renderTotal(); renderDashboard(); renderVerificacion();}
 }
 async function saveCanastillas(silent){
-  localSet(K_CAN,canastillas); cloudSet(K_CAN,canastillas).then(setSync);
+  localSet(K_CAN,canastillas); subirNube(K_CAN,canastillas);
   if(!silent){renderCanastillas(); renderDashboard();}
 }
-async function saveMovimientos(){ localSet(K_MOV,movimientos); cloudSet(K_MOV,movimientos).then(setSync); renderDashboard(); }
+async function saveMovimientos(){ localSet(K_MOV,movimientos); subirNube(K_MOV,movimientos); renderDashboard(); }
+
+/* ---------------- v4: cola de subida a la nube + botón "Guardar ahora" ----------------
+   Cada guardado ya escribe primero en este dispositivo y sube a la nube de inmediato.
+   Si la subida falla (sin internet, límite del servicio gratuito), la clave queda en
+   PEND_NUBE: se reintenta sola cada 15 s y NO se deja que una copia vieja de la nube
+   pise el cambio que todavía no subió. */
+const PEND_NUBE = {};
+function valorLocalDe(key){ return key===K_IMP?importacion : key===K_TOT?totalInv : key===K_CAN?canastillas : key===K_MOV?movimientos : null; }
+function subirNube(key, value){
+  return cloudSet(key, value).then(ok=>{
+    if(ok) delete PEND_NUBE[key]; else if(cloudBase()) PEND_NUBE[key]=true;
+    setSync(ok && !Object.keys(PEND_NUBE).length);
+    return ok;
+  });
+}
+async function empujarPendientes(){
+  for(const key of Object.keys(PEND_NUBE)){ const v=valorLocalDe(key); if(v) await subirNube(key, v); }
+}
+async function guardarAhora(){
+  const btn=document.getElementById('btnGuardarAhora'); const txt0=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando...'; }
+  localSet(K_IMP,importacion); localSet(K_TOT,totalInv); localSet(K_CAN,canastillas); localSet(K_MOV,movimientos);
+  let msg;
+  if(!cloudBase()){
+    msg='✅ Guardado en este dispositivo. Para subirlo a la nube activa ⚙️ Sincronización.';
+  } else {
+    const res = await Promise.all([K_IMP,K_TOT,K_CAN,K_MOV].map(k=>subirNube(k, valorLocalDe(k))));
+    await publicarFichasQR();
+    msg = res.every(Boolean)
+      ? '✅ Guardado en la nube · '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
+      : '⚠️ Guardado en este dispositivo. La nube no respondió; se reintenta sola cada 15 s.';
+  }
+  toast(msg);
+  if(btn){ btn.disabled=false; btn.textContent=txt0; }
+}
+document.addEventListener('keydown', ev=>{
+  if((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==='s' && SESION){ ev.preventDefault(); guardarAhora(); }
+});
+
 
 /* Revisa cambios de otros dispositivos cada 15s. No se puede bajar más:
    kvdb.io (el servicio gratuito de nube) permite máximo 1000 consultas por
@@ -954,14 +1039,15 @@ async function saveMovimientos(){ localSet(K_MOV,movimientos); cloudSet(K_MOV,mo
    siempre es instantáneo; este intervalo solo afecta qué tan rápido ves los
    cambios de otros dispositivos. */
 setInterval(async ()=>{
+  await empujarPendientes();
   const r = await Promise.all([cloudGet(K_IMP), cloudGet(K_TOT), cloudGet(K_CAN), cloudGet(K_MOV)]);
   if(r.some(x=>x===undefined)){ setSync(false); return; }
-  if(r[0] && JSON.stringify(r[0])!==JSON.stringify(importacion)){ importacion=r[0]; localSet(K_IMP,importacion); renderImportacion(); renderStatsImp(); }
-  if(r[1] && JSON.stringify(r[1])!==JSON.stringify(totalInv)){ totalInv=r[1]; localSet(K_TOT,totalInv); renderTotal(); renderVerificacion(); }
-  if(r[2] && JSON.stringify(r[2])!==JSON.stringify(canastillas)){ canastillas=r[2]; localSet(K_CAN,canastillas); renderCanastillas(); }
-  if(r[3] && JSON.stringify(r[3])!==JSON.stringify(movimientos)){ movimientos=r[3]; localSet(K_MOV,movimientos); renderMovimientos(); }
+  if(r[0] && !PEND_NUBE[K_IMP] && JSON.stringify(r[0])!==JSON.stringify(importacion)){ importacion=r[0]; localSet(K_IMP,importacion); renderImportacion(); renderStatsImp(); }
+  if(r[1] && !PEND_NUBE[K_TOT] && JSON.stringify(r[1])!==JSON.stringify(totalInv)){ totalInv=r[1]; localSet(K_TOT,totalInv); renderTotal(); renderVerificacion(); }
+  if(r[2] && !PEND_NUBE[K_CAN] && JSON.stringify(r[2])!==JSON.stringify(canastillas)){ canastillas=r[2]; localSet(K_CAN,canastillas); renderCanastillas(); }
+  if(r[3] && !PEND_NUBE[K_MOV] && JSON.stringify(r[3])!==JSON.stringify(movimientos)){ movimientos=r[3]; localSet(K_MOV,movimientos); renderMovimientos(); }
   renderDashboard();
-  setSync(true);
+  setSync(!Object.keys(PEND_NUBE).length);
 }, 15000);
 
 setInterval(()=>{
@@ -971,16 +1057,38 @@ setInterval(()=>{
 }, 5*60*1000);
 
 /* Publica una "ficha" legible por producto en la nube — esto es lo que
-   se ve al escanear el código QR: los datos reales del sistema, no Google. */
+   se ve al escanear el código QR: los datos reales del sistema, no Google.
+   v4: solo se suben las fichas que CAMBIARON (antes se subían las ~320 en cada
+   guardado y se agotaba el límite de consultas por hora del servicio gratuito). */
+let PUBLICANDO_FICHAS=false, PUBLICAR_OTRA_VEZ=false;
 async function publicarFichasQR(){
-  const todos = [...importacion.map(p=>({...p,origen:'Importación'})), ...totalInv.map(p=>({...p,origen:'Inventario Total'}))];
-  for(const p of todos){
-    const texto = `J.D ELÉCTRICOS — Ficha de producto\n`+
-      `Origen: ${p.origen}\nSKU: ${p.sku}\nDescripción: ${p.desc}\n`+
-      (p.origen==='Importación' ? `Bodega: ${p.bod}\nSaldo: ${fmtNum(p.saldo)}\n` : `Inv. Sistema: ${fmtNum(p.sistema)}\nInv. Contado: ${fmtNum(p.contado)}\n`)+
-      `Canastilla(s): ${(p.canastillas||[]).join(', ')||'—'}\nActualizado: ${fmtFecha(p.actualizado)}`;
-    cloudSetText('ficha_'+encodeURIComponent(p.sku), texto);
-  }
+  if(!cloudBase()) return;
+  if(PUBLICANDO_FICHAS){ PUBLICAR_OTRA_VEZ=true; return; }
+  PUBLICANDO_FICHAS=true;
+  try{
+    do{
+      PUBLICAR_OTRA_VEZ=false;
+      const cacheKey='jd3_fichas_cache_'+CLOUD_BUCKET;
+      const cache = localGet(cacheKey) || {};
+      const todos = [...importacion.map(p=>({...p,origen:'Importación'})), ...totalInv.map(p=>({...p,origen:'Inventario Total'}))];
+      const fichas = new Map();
+      todos.forEach(p=>{
+        const texto = `J.D ELÉCTRICOS — Ficha de producto\n`+
+          `Origen: ${p.origen}\nSKU: ${p.sku}\nDescripción: ${p.desc}\n`+
+          (p.origen==='Importación' ? `Bodega: ${p.bod}\nSaldo: ${fmtNum(p.saldo)}\n` : `Inv. Sistema: ${fmtNum(p.sistema)}\nInv. Contado: ${fmtNum(p.contado)}\n`)+
+          `Canastilla(s): ${(p.canastillas||[]).join(', ')||'—'}\nActualizado: ${fmtFecha(p.actualizado)}`;
+        fichas.set('ficha_'+encodeURIComponent(p.sku), texto);
+      });
+      const cambios = [...fichas].filter(([k,t])=>cache[k]!==t);
+      for(let i=0;i<cambios.length;i+=5){
+        const tanda = cambios.slice(i,i+5);
+        const res = await Promise.all(tanda.map(([k,t])=>cloudSetText(k,t)));
+        res.forEach((ok,j)=>{ if(ok) cache[tanda[j][0]]=tanda[j][1]; });
+        if(res.some(r=>!r)) break; // la nube rechazó: paramos y se reintenta en el próximo guardado
+      }
+      localSet(cacheKey, cache);
+    } while(PUBLICAR_OTRA_VEZ);
+  } finally { PUBLICANDO_FICHAS=false; }
 }
 
 /* El Inventario Total debe ser TODO unido: se auto-alimenta desde Importación por nombre. */
@@ -1312,6 +1420,7 @@ function renderTotal(filter){
       <td class="row-actions">
         <button onclick="abrirModalTotal('${p.id}')" title="Editar">✎</button>
         <button onclick="verQR('${p.sku}','${p.desc.replace(/'/g,"")}')" title="Ver QR">🔳</button>
+        <button onclick="pedirFoto('${p.sku}')" title="Foto del material">📷</button>
         <button class="del" onclick="eliminarTotal('${p.id}')" title="Eliminar">🗑</button>
       </td>`;
     tbody.appendChild(tr);
@@ -1327,6 +1436,7 @@ function renderTotal(filter){
   document.getElementById('progFillTot').style.width = pct+'%';
   document.getElementById('progTextoTot').textContent = `${contados} de ${totalInv.length} productos contados`;
   document.getElementById('progPctTot').textContent = pct+'%';
+  actualizarBotonDeshacer();
   actualizarDatalists();
 }
 function abrirModalTotal(id){
@@ -1633,6 +1743,44 @@ function abrirModalMovimiento(tipo){
   if(SESION){ document.getElementById('movResponsable').value = SESION.nombre; document.getElementById('movResponsable').disabled = true; }
   document.getElementById('modalMovimiento').classList.add('open');
 }
+/* ---------------- v4: una entrada/salida mueve SISTEMA y CONTEO a la vez ----------------
+   Regla: si el producto YA tiene conteo, el mismo movimiento se suma/resta también al
+   conteo (así la diferencia no cambia por un movimiento legítimo). Si todavía está
+   "pendiente por contar", el conteo no se toca (seguiría pendiente).
+   opts.conteo: 'auto' (regla anterior) | true (forzar) | false (solo sistema). */
+function sinConteo(p){ return !p.contadoPor && !p.fechaConteo; }
+function aplicarMovimientoDoble(p, tipo, cantidad, opts){
+  opts = opts||{};
+  const modoConteo = (opts.conteo===undefined) ? 'auto' : opts.conteo;
+  const delta = tipo==='entrada' ? cantidad : -cantidad;
+  const ahora = new Date().toISOString();
+  const quien = opts.responsable || (SESION?SESION.nombre:'');
+  let fuente = p, ref;
+  // Si el producto es del Inventario Total pero su nombre también está en Importación, el sistema se
+  // calcula desde el saldo de la bodega: hay que mover ese saldo o el cambio se pierde al sincronizar.
+  if(!importacion.includes(p)){
+    const filas = importacion.filter(x=>normDesc(x.desc)===normDesc(p.desc));
+    if(filas.length) fuente = (tipo==='salida' && filas.find(x=>(x.saldo||0)>=cantidad)) || filas[0];
+  }
+  if(importacion.includes(fuente)){
+    fuente.saldo = (fuente.saldo||0)+delta; fuente.actualizado=ahora;
+    sincronizarImportacionATotal();
+    ref = totalInv.find(t=>normDesc(t.desc)===normDesc(fuente.desc));
+  } else {
+    fuente.sistema = (fuente.sistema||0)+delta; fuente.actualizado=ahora; ref=fuente;
+  }
+  let contadoAfectado=false;
+  if(ref && (modoConteo===true || (modoConteo==='auto' && !sinConteo(ref)))){
+    ref.contado = (ref.contado||0)+delta; ref.actualizado=ahora;
+    if(sinConteo(ref)){ ref.contadoPor = quien||'Movimiento'; ref.fechaConteo=ahora; }
+    contadoAfectado=true;
+  }
+  return {fuente, ref, contadoAfectado};
+}
+function guardarTrasMovimiento(fuente){
+  if(importacion.includes(fuente)) saveImportacion(true);
+  saveTotal(true);
+}
 function guardarMovimiento(){
   const tipo=document.getElementById('movTipo').value;
   const query=document.getElementById('movProducto').value;
@@ -1644,15 +1792,13 @@ function guardarMovimiento(){
   const p=buscarProductoGlobal(query);
   if(!p){toast('Selecciona un producto válido de la lista');return;}
   if(!cantidad||cantidad<=0){toast('Escribe una cantidad válida');return;}
-  const campo = importacion.includes(p) ? 'saldo' : 'sistema';
-  p[campo] = (p[campo]||0) + (tipo==='entrada'?cantidad:-cantidad);
-  p.actualizado=new Date().toISOString();
-  movimientos.push({id:'mov'+Date.now(), fecha:new Date().toISOString(), tipo, sku:p.sku, desc:p.desc, cantidad, responsable, proveedor, guia, obs});
+  const r = aplicarMovimientoDoble(p, tipo, cantidad, {responsable});
+  movimientos.push({id:'mov'+Date.now(), fecha:new Date().toISOString(), tipo, sku:p.sku, desc:p.desc, cantidad, responsable, proveedor, guia, obs, conteo:r.contadoAfectado});
   saveMovimientos();
-  if(importacion.includes(p)) saveImportacion(true); else saveTotal(true);
-  renderImportacion(); renderTotal(); renderMovimientos();
+  guardarTrasMovimiento(r.fuente);
+  renderImportacion(); renderTotal(); renderMovimientos(); renderVerificacion();
   cerrarModal('modalMovimiento');
-  toast((tipo==='entrada'?'Entrada':'Salida')+' registrada');
+  toast((tipo==='entrada'?'Entrada':'Salida')+' registrada'+(r.contadoAfectado?' en sistema y conteo':' en sistema (aún sin conteo)'));
 }
 function generarReporte(tipo){
   const ahora = new Date();
@@ -1772,6 +1918,7 @@ function revisarVistaComercialURL(){
     document.body.classList.remove('sin-sesion');
     document.getElementById('sidebar').style.display='none';
     document.getElementById('asistenteBtn').style.display='none';
+    document.getElementById('btnGuardarAhora').style.display='none';
     document.querySelectorAll('.sb-nav .sb-item').forEach(b=>b.classList.remove('active'));
     document.getElementById('topbarTitle').textContent = TITULOS.comercial;
     TABS_TOTALES.forEach(t=>{
@@ -1982,14 +2129,12 @@ function guardarMovimientoRapido(){
   const obs = document.getElementById('frObs').value.trim();
   if(!cantidad || cantidad<=0){ toast('Escribe una cantidad válida'); return; }
   if(!responsable){ toast('Escribe el nombre de quien hace el movimiento'); return; }
-  const campo = importacion.includes(p) ? 'saldo' : 'sistema';
-  p[campo] = (p[campo]||0) + (tipo==='entrada'?cantidad:-cantidad);
-  p.actualizado = new Date().toISOString();
-  movimientos.push({id:'mov'+Date.now(), fecha:new Date().toISOString(), tipo, sku:p.sku, desc:p.desc, cantidad, responsable, proveedor, guia, obs});
+  const r = aplicarMovimientoDoble(p, tipo, cantidad, {responsable});
+  movimientos.push({id:'mov'+Date.now(), fecha:new Date().toISOString(), tipo, sku:p.sku, desc:p.desc, cantidad, responsable, proveedor, guia, obs, conteo:r.contadoAfectado});
   saveMovimientos();
-  if(importacion.includes(p)) saveImportacion(true); else saveTotal(true);
-  renderImportacion(); renderTotal(); renderMovimientos();
-  toast((tipo==='entrada'?'Entrada':'Salida')+' registrada por '+responsable);
+  guardarTrasMovimiento(r.fuente);
+  renderImportacion(); renderTotal(); renderMovimientos(); renderVerificacion();
+  toast((tipo==='entrada'?'Entrada':'Salida')+' registrada por '+responsable+(r.contadoAfectado?' (sistema y conteo)':' (solo sistema, aún sin conteo)'));
   abrirFichaRapidaPorSku(sku); // refresca el saldo mostrado para poder seguir registrando
   ['frCantidad','frObs'].forEach(f=>document.getElementById(f).value='');
 }
@@ -2033,20 +2178,377 @@ function cerrarEscaner(){
   cerrarModal('modalEscaner');
 }
 
-/* ---------------- ASISTENTE DE MATERIALES ---------------- */
+/* ---------------- v4: IMPORTAR CONTEO (Excel / CSV / PDF) CON VISTA PREVIA ---------------- */
+let IC = { grupos:[], archivo:'', filasLeidas:0, sinEncabezado:false };
+const IC_ALIAS = {
+  sku:['SKU','CODIGO','COD','CODIGOPRODUCTO','CODIGOSKU','REFERENCIA','REF'],
+  desc:['DESCRIPCION','DESCRIP','PRODUCTO','MATERIAL','NOMBRE','ARTICULO','DETALLE','DESCRIPCIONPRODUCTO'],
+  contado:['INVCONTADO','INVENTARIOCONTADO','CONTADO','CONTEO','CONTEOFISICO','FISICO','INVFISICO','CANTIDADCONTADA','CANTIDADFISICA','CANTIDAD','CANT','EXISTENCIA','UNIDADES'],
+  sistema:['INVSISTEMA','INVENTARIOSISTEMA','SISTEMA','SALDO','STOCK'],
+  por:['CONTADOPOR','RESPONSABLE','CONTADOR'],
+  canast:['CANASTILLAS','CANASTILLA','UBICACION']
+};
+function icNorm(s){ return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,''); }
+function txtPlano(s){ return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]+/g,' ').trim(); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* Números como los escriben en Colombia: 1.234 = mil doscientos treinta y cuatro; 1,5 = uno coma cinco */
+function parseNumES(v){
+  if(typeof v==='number') return isFinite(v)?v:null;
+  let s=String(v==null?'':v).trim().replace(/\s/g,'');
+  if(!s || !/^-?[\d.,]+$/.test(s)) return null;
+  const c=s.lastIndexOf(','), d=s.lastIndexOf('.');
+  if(c>-1 && d>-1){ s = (c>d) ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,''); }
+  else if(c>-1){ s = /^-?\d{1,3}(,\d{3})+$/.test(s) ? s.replace(/,/g,'') : s.replace(',','.'); }
+  else if(d>-1){ s = /^-?\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g,'') : s; }
+  const n=parseFloat(s); return isFinite(n)?n:null;
+}
+function icMatrizDeLibro(wb){
+  let mejor=[];
+  wb.SheetNames.forEach(n=>{
+    const m = XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, defval:'', raw:true});
+    if(m.length>mejor.length) mejor=m;
+  });
+  return mejor;
+}
+function icParseCsv(texto){
+  texto = texto.replace(/^\uFEFF/,'');
+  const primera = texto.split(/\r?\n/).find(l=>l.trim()) || '';
+  const cuentas = {',':0,';':0,'\t':0,'|':0}; let q=false;
+  for(const ch of primera){ if(ch==='"') q=!q; else if(!q && ch in cuentas) cuentas[ch]++; }
+  const sep = Object.keys(cuentas).sort((a,b)=>cuentas[b]-cuentas[a])[0];
+  const filas=[]; let fila=[], cel='', dentro=false;
+  for(let i=0;i<texto.length;i++){
+    const ch=texto[i];
+    if(dentro){ if(ch==='"'){ if(texto[i+1]==='"'){ cel+='"'; i++; } else dentro=false; } else cel+=ch; }
+    else if(ch==='"') dentro=true;
+    else if(ch===sep){ fila.push(cel); cel=''; }
+    else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&texto[i+1]==='\n') i++; fila.push(cel); cel=''; filas.push(fila); fila=[]; }
+    else cel+=ch;
+  }
+  if(cel!==''||fila.length){ fila.push(cel); filas.push(fila); }
+  return filas;
+}
+function icMatrizDeCsv(buf){
+  let texto; try{ texto=new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(e){ texto=new TextDecoder('windows-1252').decode(buf); }
+  return icParseCsv(texto);
+}
+/* PDF: se lee con pdf.js (solo funciona con PDFs que tienen texto, no con fotos/escaneos) */
+function cargarPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve();
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; res(); };
+    s.onerror=()=>rej(new Error('No se pudo cargar el lector de PDF (revisa la conexión a internet)'));
+    document.head.appendChild(s);
+  });
+}
+async function icMatrizDePdf(buf){
+  await cargarPdfJs();
+  const pdf = await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  const filas=[];
+  for(let n=1;n<=pdf.numPages;n++){
+    const pag = await pdf.getPage(n);
+    const txt = await pag.getTextContent();
+    const items = txt.items.filter(i=>i.str && i.str.trim()).map(i=>({t:i.str.trim(), x:i.transform[4], y:i.transform[5], w:i.width||0}));
+    items.sort((a,b)=> (b.y-a.y) || (a.x-b.x));
+    let linea=[], yRef=null;
+    const cerrar=()=>{ if(linea.length){ filas.push(icCeldasPdf(linea)); linea=[]; } };
+    items.forEach(it=>{ if(yRef===null || Math.abs(it.y-yRef)>3){ cerrar(); yRef=it.y; } linea.push(it); });
+    cerrar();
+  }
+  return filas;
+}
+function icCeldasPdf(linea){
+  linea.sort((a,b)=>a.x-b.x);
+  const celdas=[]; let ult=null;
+  linea.forEach(it=>{
+    if(ult && (it.x-(ult.x+ult.w))<6){ ult.t+=' '+it.t; ult.w=(it.x+it.w)-ult.x; }
+    else { ult={t:it.t,x:it.x,w:it.w}; celdas.push(ult); }
+  });
+  return celdas.map(c=>c.t);
+}
+function icBuscarEncabezado(m){
+  for(let i=0;i<Math.min(m.length,25);i++){
+    const cel=(m[i]||[]).map(icNorm);
+    const idx={};
+    Object.keys(IC_ALIAS).forEach(k=>{ let f=-1; for(const a of IC_ALIAS[k]){ const j=cel.indexOf(a); if(j>=0){ f=j; break; } } idx[k]=f; });
+    if(idx.contado>=0 && (idx.desc>=0||idx.sku>=0)) return {fila:i, idx};
+  }
+  return null;
+}
+function icFilasDesdeMatriz(m){
+  const enc=icBuscarEncabezado(m);
+  const out=[];
+  if(enc){
+    const {fila,idx}=enc;
+    for(let i=fila+1;i<m.length;i++){
+      const r=m[i]||[];
+      const sku = idx.sku>=0 ? String(r[idx.sku]==null?'':r[idx.sku]).trim() : '';
+      const desc = idx.desc>=0 ? String(r[idx.desc]==null?'':r[idx.desc]).trim() : '';
+      const cont = parseNumES(r[idx.contado]);
+      if((!sku && !desc) || cont===null) continue;
+      if(/^TOTAL(ES)?$/.test(icNorm(desc||sku))) continue;
+      out.push({
+        sku, desc, contado:cont,
+        sistema: idx.sistema>=0 ? parseNumES(r[idx.sistema]) : null,
+        por: idx.por>=0 ? String(r[idx.por]==null?'':r[idx.por]).trim() : '',
+        canast: idx.canast>=0 ? String(r[idx.canast]==null?'':r[idx.canast]).split(',').map(normCodigoCanastilla).filter(Boolean) : []
+      });
+    }
+    return {filas:out, sinEncabezado:false};
+  }
+  // Sin encabezados (típico de un PDF): última celda numérica = cantidad; lo demás = SKU/descripción
+  for(let i=0;i<m.length;i++){
+    const celdas=(m[i]||[]).map(c=>String(c==null?'':c).trim()).filter(Boolean);
+    if(celdas.length<2) continue;
+    const cont=parseNumES(celdas[celdas.length-1]);
+    if(cont===null) continue;
+    let resto=celdas.slice(0,-1);
+    if(resto.length>=2 && /^\d{1,4}$/.test(resto[0])) resto=resto.slice(1); // número de línea
+    let sku='';
+    if(resto.length>=2 && totalInv.some(t=>t.sku.toUpperCase()===resto[0].toUpperCase())){ sku=resto[0]; resto=resto.slice(1); }
+    const desc=resto.join(' ').trim();
+    if(!/[A-Za-z]/.test(desc||sku)) continue;
+    out.push({sku, desc, contado:cont, sistema:null, por:'', canast:[]});
+  }
+  return {filas:out, sinEncabezado:true};
+}
+function icEncontrar(sku, desc){
+  if(sku){ const p=totalInv.find(t=>t.sku.toUpperCase()===sku.toUpperCase()); if(p) return {p,tipo:'exacto'}; }
+  if(desc){
+    const nd=txtPlano(desc);
+    let p=totalInv.find(t=>txtPlano(t.desc)===nd); if(p) return {p,tipo:'exacto'};
+    if(nd.length>=6){
+      const c=totalInv.filter(t=>{ const x=txtPlano(t.desc); return x.length>=6 && (x.includes(nd)||nd.includes(x)); });
+      if(c.length===1) return {p:c[0],tipo:'aprox'};
+    }
+  }
+  return null;
+}
+function icEmparejar(filas){
+  const grupos=new Map();
+  filas.forEach(f=>{
+    const hit=icEncontrar(f.sku,f.desc);
+    const key = hit ? 'p:'+hit.p.id : 'n:'+(txtPlano(f.desc)||f.sku);
+    let g=grupos.get(key);
+    if(!g){
+      g={p:hit?hit.p:null, tipo:hit?hit.tipo:'nuevo', sku:f.sku, desc:f.desc, cantidad:0, filas:0, por:'', canast:new Set(), sistemaArchivo:null, aplicar:!!hit && hit.tipo==='exacto'};
+      grupos.set(key,g);
+    }
+    g.cantidad+=f.contado; g.filas++;
+    if(f.por) g.por=f.por;
+    f.canast.forEach(c=>g.canast.add(c));
+    if(f.sistema!=null) g.sistemaArchivo=(g.sistemaArchivo||0)+f.sistema;
+  });
+  return [...grupos.values()];
+}
+function abrirImportadorConteo(evt){
+  const file=evt.target.files[0]; if(!file) return;
+  const nombre=file.name, ext=(nombre.split('.').pop()||'').toLowerCase();
+  toast('Leyendo '+nombre+'...');
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    evt.target.value='';
+    try{
+      let matriz;
+      if(ext==='pdf') matriz=await icMatrizDePdf(e.target.result);
+      else if(ext==='csv' || ext==='txt') matriz=icMatrizDeCsv(e.target.result);
+      else matriz=icMatrizDeLibro(XLSX.read(e.target.result,{type:'array'}));
+      const {filas,sinEncabezado}=icFilasDesdeMatriz(matriz);
+      if(!filas.length){ toast('No encontré filas con cantidades. El archivo necesita columnas como Descripción (o SKU) y Conteo.'); return; }
+      IC={grupos:icEmparejar(filas), archivo:nombre, filasLeidas:filas.length, sinEncabezado};
+      document.getElementById('icContadoPor').value = '';
+      icRender();
+      document.getElementById('modalImportConteo').classList.add('open');
+    }catch(err){
+      console.error(err);
+      toast(ext==='pdf' ? 'No pude leer el PDF (¿es una foto o un escaneo? Con esos usa Excel).' : 'Error leyendo el archivo. Verifica el formato.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function icNuevoConteo(g, modo){ return (modo==='sumar' && g.p) ? ((g.p.contado||0)+g.cantidad) : g.cantidad; }
+function icRender(){
+  const modo=document.getElementById('icModo').value;
+  let nEx=0,nAp=0,nNu=0;
+  document.getElementById('icTabla').innerHTML = IC.grupos.map((g,i)=>{
+    if(g.tipo==='exacto') nEx++; else if(g.tipo==='aprox') nAp++; else nNu++;
+    const sis = g.p ? (g.p.sistema||0) : (g.sistemaArchivo||0);
+    const actual = (g.p && !sinConteo(g.p)) ? fmtNum(g.p.contado) : '<span style="color:var(--tenue)">—</span>';
+    const nuevo = icNuevoConteo(g,modo);
+    const diff = nuevo - sis;
+    const cls = diff>0?'pos-sobra':diff<0?'pos-falta':'pos-ok';
+    const tag = g.tipo==='exacto' ? '<span class="ic-tag ic-ok">Coincide</span>' : g.tipo==='aprox' ? '<span class="ic-tag ic-aprox">⚠ Aproximado</span>' : '<span class="ic-tag ic-nuevo">No existe</span>';
+    const nombre = g.p ? esc(g.p.desc) : esc(g.desc||g.sku);
+    const nota = (g.tipo!=='exacto' ? `<div class="ic-archivo">En el archivo: ${esc(g.desc||g.sku)}</div>` : '') + (g.filas>1 ? `<div class="ic-archivo">${g.filas} filas sumadas</div>` : '');
+    return `<tr>
+      <td><input type="checkbox" ${g.aplicar?'checked':''} onchange="IC.grupos[${i}].aplicar=this.checked; icActualizarBoton();"></td>
+      <td>${tag}</td>
+      <td>${g.p?`<span class="sku">${esc(g.p.sku)}</span> — `:''}${nombre}${nota}</td>
+      <td>${fmtNum(sis)}</td><td>${actual}</td><td><b>${fmtNum(nuevo)}</b></td>
+      <td class="${cls}">${diff>0?'+':''}${fmtNum(diff)}</td></tr>`;
+  }).join('');
+  document.getElementById('icResumen').innerHTML =
+    `📄 <b>${esc(IC.archivo)}</b>: ${IC.filasLeidas} filas leídas → <b>${nEx}</b> coinciden, <b>${nAp}</b> aproximados, <b>${nNu}</b> no existen en el catálogo.`
+    + (IC.sinEncabezado ? `<br>⚠️ No encontré encabezados de columna; leí cada línea como “descripción … cantidad”. Revisa bien la tabla antes de aplicar.` : '');
+  icActualizarBoton();
+}
+function icActualizarBoton(){
+  const n=IC.grupos.filter(g=>g.aplicar).length;
+  const b=document.getElementById('icAplicar'); b.textContent='Aplicar conteo ('+n+')'; b.disabled=!n;
+}
+function icAplicar(){
+  const sel=IC.grupos.filter(g=>g.aplicar);
+  if(!sel.length){ toast('No hay filas marcadas para aplicar'); return; }
+  const modo=document.getElementById('icModo').value;
+  const por=document.getElementById('icContadoPor').value.trim();
+  const now=new Date().toISOString();
+  localSet('jd3_undo_conteo', {fecha:now, totalInv, canastillas}); // copia para poder deshacer
+  let act=0, nue=0;
+  sel.forEach(g=>{
+    const quien = por || g.por || (SESION?SESION.nombre:'Importación');
+    const nuevo = icNuevoConteo(g,modo);
+    if(g.p){
+      g.p.contado=nuevo; g.p.contadoPor=quien; g.p.fechaConteo=now; g.p.actualizado=now;
+      if(g.canast.size) g.p.canastillas=[...new Set([...(g.p.canastillas||[]),...g.canast])];
+      act++;
+    } else {
+      let sku=g.sku && !totalInv.some(t=>t.sku.toUpperCase()===g.sku.toUpperCase()) ? g.sku : generarSkuUnico(g.desc||g.sku, totalInv.map(t=>t.sku));
+      totalInv.push({id:'tot'+Date.now()+Math.random().toString(36).slice(2,6), sku, desc:(g.desc||g.sku), sistema:g.sistemaArchivo||0, contado:nuevo, contadoPor:quien, fechaConteo:now, canastillas:[...g.canast], actualizado:now});
+      nue++;
+    }
+    g.canast.forEach(asegurarCanastilla);
+  });
+  saveTotal(); saveCanastillas(); renderVerificacion();
+  cerrarModal('modalImportConteo');
+  actualizarBotonDeshacer();
+  toast(`Conteo aplicado: ${act} actualizados${nue?`, ${nue} nuevos`:''}. Ya se guardó.`);
+}
+function actualizarBotonDeshacer(){
+  const b=document.getElementById('btnDeshacerImp'); if(!b) return;
+  let hay=false; try{ hay=!!localStorage.getItem('jd3_undo_conteo'); }catch(e){}
+  b.style.display = hay ? '' : 'none';
+}
+function deshacerImportacionConteo(){
+  const snap=localGet('jd3_undo_conteo');
+  if(!snap){ toast('No hay ninguna importación para deshacer'); actualizarBotonDeshacer(); return; }
+  if(!confirm('¿Deshacer la última importación de conteo? El Inventario Total y las Canastillas vuelven al estado de '+fmtFecha(snap.fecha)+'. Se pierde cualquier cambio hecho después de esa hora.')) return;
+  totalInv=snap.totalInv; canastillas=snap.canastillas;
+  try{ localStorage.removeItem('jd3_undo_conteo'); }catch(e){}
+  saveTotal(); saveCanastillas(); renderVerificacion(); actualizarBotonDeshacer();
+  toast('Importación deshecha');
+}
+
+/* ---------------- ASISTENTE DE MATERIALES (v4: entiende órdenes, voz y fotos) ----------------
+   Funciona SIN servicios externos: interpreta frases en español con reglas. Toda orden que cambia
+   inventario pide una confirmación de un toque antes de ejecutarse. */
+const ASIS = { pendiente:null };
+let ASIS_UID = 0;
+const V_SUMA = new Set(['agrega','agregar','agregue','agregame','agregale','anade','anadir','anadele','suma','sumar','sumale','ingresa','ingresar','aumenta','aumentar','pon','poner','ponle','mete','meter','recibi','recibimos','llegaron','llego','entraron','entro']);
+const V_RESTA = new Set(['resta','restar','restale','quita','quitar','quitale','saca','sacar','sacale','descuenta','descontar','disminuye','disminuir','gaste','gastamos','salieron','salio','despacha','despachar','despache','despachamos']);
+const V_FIJA = new Set(['conte','contamos','cuente','cuento','fija','fijar','deja','dejar','establece','establecer','corrige','corregir','actualiza','actualizar','cambia','cambiar']);
+const ASIS_UNIDADES = new Set(['unidades','unidad','und','uds','ud','piezas','pieza','pzas','pza','metros','mts','kg','kilos','rollos','cajas','bolsas','libras','galones','paquetes']);
+const ASIS_RUIDO = new Set(('a al de del en el la los las un una unos unas y o u tambien ademas por para con sin que quiero necesito puedes podrias puedo me mi mis te se lo le les es son esta estan hay tengo tenemos '+
+  'cuanto cuantos cuanta cuantas donde dame darme muestrame mostrar ensename ensenar busca buscame buscar encuentra encontrar ver foto fotos imagen imagenes fotografia '+
+  'material materiales producto productos referencia inventario conteo contado contados contada fisico fisica sistema ambos ambas dos solo solamente '+
+  'unidades unidad und uds ud piezas pieza pzas pza cantidad favor porfa hola oye bro asistente ok listo dale mas menos como cual quedo quedaron '+
+  'registra registrar anota anotar haz hazme hacer entrada salida entradas salidas').split(' '));
+const NUM_UNI={cero:0,un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20,veintiun:21,veintiuno:21,veintiuna:21,veintidos:22,veintitres:23,veinticuatro:24,veinticinco:25,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29};
+const NUM_DEC={treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90};
+const NUM_CEN={cien:100,ciento:100,doscientos:200,trescientos:300,cuatrocientos:400,quinientos:500,seiscientos:600,setecientos:700,ochocientos:800,novecientos:900};
+const ORDINALES={primero:1,primer:1,primera:1,uno:1,segundo:2,segunda:2,dos:2,tercero:3,tercera:3,tres:3,cuarto:4,cuarta:4,cuatro:4,quinto:5,quinta:5,cinco:5,sexto:6,sexta:6,seis:6};
+
+function txtNorm(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[¿?¡!;:"“”()]/g,' ').replace(/,(?!\d)/g,' ').replace(/\s+/g,' ').trim();
+}
+function asisPalabras(t){ return t.split(' ').map(w=>w.replace(/^\.+|\.+$/g,'')).filter(Boolean); }
+function asisChunk(w,i){ // lee 0-999 en palabras; devuelve {v,j} o null
+  let v=0, j=i, ok=false;
+  if(NUM_CEN[w[j]]!==undefined){ v+=NUM_CEN[w[j]]; j++; ok=true; }
+  if(NUM_DEC[w[j]]!==undefined){ v+=NUM_DEC[w[j]]; j++; ok=true; if(w[j]==='y' && NUM_UNI[w[j+1]]!==undefined && NUM_UNI[w[j+1]]<10){ v+=NUM_UNI[w[j+1]]; j+=2; } }
+  else if(NUM_UNI[w[j]]!==undefined){ v+=NUM_UNI[w[j]]; j++; ok=true; }
+  return ok ? {v,j} : null;
+}
+/* Lee un número (en cifras o en palabras) que empiece en la posición i. */
+function asisNumeroEn(w,i){
+  if(i>=w.length) return null;
+  if(/^\d[\d.,]*$/.test(w[i])){ const n=parseNumES(w[i]); return n===null?null:{valor:n,ini:i,fin:i+1}; }
+  let a=asisChunk(w,i), j=i, total=0;
+  if(w[i]==='mil'){ total=1000; j=i+1; const b=asisChunk(w,j); if(b){ total+=b.v; j=b.j; } return {valor:total,ini:i,fin:j}; }
+  if(!a) return null;
+  total=a.v; j=a.j;
+  if(w[j]==='mil'){ total*=1000; j++; const b=asisChunk(w,j); if(b){ total+=b.v; j=b.j; } }
+  return {valor:total,ini:i,fin:j};
+}
+function asisBuscarVerbo(w){
+  for(let i=0;i<w.length;i++){
+    if(V_FIJA.has(w[i])) return {i,tipo:'fijar',w:w[i]};
+    if(V_RESTA.has(w[i])) return {i,tipo:'restar',w:w[i]};
+    if(V_SUMA.has(w[i])) return {i,tipo:'sumar',w:w[i]};
+  }
+  return null;
+}
+function asisTokensProducto(w, usados){
+  const out=[];
+  w.forEach((x,i)=>{
+    if(usados && usados.has(i)) return;
+    if(ASIS_RUIDO.has(x) || V_SUMA.has(x) || V_RESTA.has(x) || V_FIJA.has(x)) return;
+    x.split(/[^a-z0-9]+/).forEach(s=>{ if(s && !ASIS_RUIDO.has(s)) out.push(s); });
+  });
+  return out;
+}
+function buscarMateriales(tokens){
+  tokens=tokens.filter(Boolean); if(!tokens.length) return [];
+  if(tokens.length===1){ const s=totalInv.find(p=>p.sku.toLowerCase()===tokens[0]); if(s) return [s]; }
+  const punt=totalInv.map(p=>{
+    const hay=' '+txtNorm(p.desc).replace(/[^a-z0-9]+/g,' ')+' '+p.sku.toLowerCase()+' ';
+    let ok=0;
+    tokens.forEach(k=>{
+      const v=[k]; if(k.length>3&&k.endsWith('s')) v.push(k.slice(0,-1)); if(k.length>4&&k.endsWith('es')) v.push(k.slice(0,-2));
+      if(v.some(x=>hay.includes(x))) ok++;
+    });
+    return {p,frac:ok/tokens.length,len:p.desc.length};
+  }).filter(x=>x.frac>0);
+  const completos=punt.filter(x=>x.frac===1);
+  const pool = completos.length ? completos : (tokens.length>=2 ? punt.filter(x=>x.frac>=0.6) : []);
+  pool.sort((a,b)=>b.frac-a.frac || a.len-b.len);
+  return pool.slice(0,6).map(x=>x.p);
+}
+function asisGanadorClaro(c,tokens){
+  const t=tokens.join(' ');
+  return c.some(p=>txtNorm(p.desc).replace(/[^a-z0-9]+/g,' ').trim()===t) ? c.find(p=>txtNorm(p.desc).replace(/[^a-z0-9]+/g,' ').trim()===t) : null;
+}
+
+/* ---- panel ---- */
 function toggleAsistente(){
   const panel=document.getElementById('asistentePanel');
   panel.classList.toggle('open');
   if(panel.classList.contains('open') && !panel.dataset.iniciado){
     panel.dataset.iniciado='1';
-    agregarMsgAsistente('bot','¡Hola'+(SESION?', '+SESION.nombre:'')+'! Pregúntame por el nombre o SKU de un material y te digo cuánto hay y en qué bodega o canastilla está. Ej: "¿dónde está el contactor 40A?"');
+    asisAyuda(true);
   }
 }
 function agregarMsgAsistente(tipo, texto){
   const body=document.getElementById('asistenteBody');
-  const div=document.createElement('div'); div.className='asis-msg '+tipo; div.innerHTML=texto;
+  const div=document.createElement('div'); div.className='asis-msg '+tipo;
+  if(tipo==='user') div.textContent=texto; else div.innerHTML=texto;
   body.appendChild(div);
   body.scrollTop = body.scrollHeight;
+  return div;
+}
+function chip(texto, onclick, cls){ return `<button class="asis-chip ${cls||''}" onclick="${onclick}">${texto}</button>`; }
+function asisRapido(texto){ document.getElementById('asistenteInput').value=texto; preguntarAsistente(); }
+function asisAyuda(primera){
+  agregarMsgAsistente('bot',
+    `¡Hola${SESION?', '+esc(SESION.nombre):''}! Escríbeme o toca 🎤 y háblame. Puedo:<ul>
+     <li><b>Buscar</b>: “¿dónde está el contactor 40A?” · “foto del chispero”</li>
+     <li><b>Sumar o restar</b>: “agrega 10 de soldadura 90grs al conteo y al sistema”, “saca 3 de X”</li>
+     <li><b>Fijar el conteo</b>: “conté 45 de X”</li>
+     <li><b>Revisar</b>: “¿qué falta por contar?”, “diferencias”, “¿qué me recomiendas?”</li></ul>
+     Antes de cambiar algo te muestro el antes y el después para que confirmes.`
+    + `<div class="asis-chips">${chip('¿Qué me recomiendas?',"asisRapido('¿qué me recomiendas?')")}${chip('Pendientes por contar',"asisRapido('pendientes por contar')")}${chip('Diferencias',"asisRapido('diferencias')")}</div>`);
 }
 function preguntarAsistente(){
   const input=document.getElementById('asistenteInput');
@@ -2054,23 +2556,319 @@ function preguntarAsistente(){
   if(!q) return;
   agregarMsgAsistente('user', q);
   input.value='';
-  const respuesta = responderAsistente(q);
-  setTimeout(()=>agregarMsgAsistente('bot', respuesta), 250);
+  try{ procesarAsistente(q); }
+  catch(e){ console.error(e); agregarMsgAsistente('bot','Tuve un problema entendiendo eso. Intenta decirlo de otra forma.'); }
 }
-function responderAsistente(q){
-  const limpio = q.toLowerCase()
-    .replace(/dónde está|donde esta|dónde|donde|está|esta|el|la|los|las|un|una|de|cuánto hay|cuanto hay|cuánto|cuanto|hay|\?|¿/g,' ')
-    .replace(/\s+/g,' ').trim();
-  if(!limpio) return 'Escribe el nombre o SKU del material que buscas.';
-  const all = [...importacion.map(p=>({...p,origen:'Importación'})), ...totalInv.map(p=>({...p,origen:'Inventario Total'}))];
-  const matches = all.filter(p=>p.sku.toLowerCase().includes(limpio) || p.desc.toLowerCase().includes(limpio));
-  if(!matches.length) return 'No encontré ningún material que coincida con "'+q+'". Intenta con otra palabra o el SKU exacto.';
-  return matches.slice(0,5).map(p=>{
-    const stock = p.origen==='Importación' ? p.saldo : (p.contado||p.sistema||0);
-    const bodegaTxt = p.origen==='Importación' ? ' · Bodega '+p.bod : '';
-    return `<b>${p.desc}</b> (${p.sku})<br>Disponible: ${fmtNum(stock)}${bodegaTxt}<br>📍 ${ubicacionTextoDeProducto(p)}`;
-  }).join('<hr style="border-color:var(--borde);opacity:.3;margin:8px 0;">');
+
+/* ---- cerebro ---- */
+function procesarAsistente(q){
+  const t=txtNorm(q);
+  if(ASIS.pendiente && asisManejarPendiente(t)) return;
+  ASIS.pendiente=null;
+  const w=asisPalabras(t);
+  if(!w.length) return agregarMsgAsistente('bot','Dime qué necesitas.');
+  if(/^(hola|buenas|buenos dias|buenas tardes|buenas noches|gracias|muchas gracias|ok|listo|vale)\b/.test(t) && w.length<=3) return agregarMsgAsistente('bot', /gracias/.test(t)?'¡Con gusto! 👍':'Aquí estoy. ¿Qué necesitas?');
+  if(/\b(ayuda|que puedes|que sabes|comandos)\b/.test(t)) return asisAyuda();
+
+  // 1) órdenes que cambian inventario
+  let acc=null;
+  const nombreEntSal = t.match(/\b(registra|registrar|anota|anotar|haz|hazme|hacer)\s+(?:una\s+|un\s+)?(entrada|salida)\b/);
+  let verbo = asisBuscarVerbo(w);
+  if(verbo && verbo.tipo==='fijar' && !/^(conte|contamos|cuente|cuento)$/.test(verbo.w) && !/\b(conteo|contado|fisico)\b/.test(t)) verbo=null;
+  if(!verbo && nombreEntSal){ verbo={i:w.indexOf(nombreEntSal[2]), tipo:nombreEntSal[2]==='entrada'?'sumar':'restar', w:nombreEntSal[2]}; }
+  if(verbo){
+    const usados=new Set([verbo.i]);
+    if(nombreEntSal){ w.forEach((x,i)=>{ if(x==='entrada'||x==='salida') usados.add(i); }); }
+    // cantidad: número justo después del verbo, o número + unidad, o (al fijar) número al final
+    let n=null;
+    const FILL=new Set(['a','al','de','del','en','la','el','le','me','se','lo','los','las','mas','menos','otras','otros','unas','unos','como']);
+    let j=verbo.i+1; while(j<w.length && FILL.has(w[j])) j++;
+    n=asisNumeroEn(w,j);
+    if(!n){ for(let i=verbo.i+1;i<w.length;i++){ if(/^\d[\d.,]*$/.test(w[i]) && ASIS_UNIDADES.has(w[i+1])){ n=asisNumeroEn(w,i); break; } } }
+    if(!n && verbo.tipo==='fijar'){ const m=t.match(/\b(?:en|a|por|son|es|hay|quedo en|quedaron)\s+(\d[\d.,]*)\s*(?:unidades|und|uds)?\s*$/); if(m){ const idx=w.lastIndexOf(m[1]); if(idx>=0) n=asisNumeroEn(w,idx); } }
+    if(n){ for(let k=n.ini;k<n.fin;k++) usados.add(k); }
+    const hayConteo=/\b(conteo|contado|contados|contada|fisico|fisica)\b/.test(t), haySis=/\bsistema\b/.test(t);
+    const scope = (hayConteo&&haySis)?'ambos' : hayConteo?'conteo' : haySis?'sistema' : 'auto';
+    acc={ tipo:verbo.tipo, cantidad:n?n.valor:null, scope, tokens:asisTokensProducto(w,usados) };
+    if(acc.tipo==='fijar' && scope==='sistema'){ return agregarMsgAsistente('bot','El <b>Inv. Sistema</b> viene de Importación: se cambia con entradas y salidas (“agrega 10 de X” / “saca 3 de X”), no fijándolo directo.'); }
+    return asisResolverProducto(acc);
+  }
+
+  // 2) consultas y reportes
+  if(/(recomiend|que debo|que hago|que me conviene|lo mejor|por donde empiezo|prioridad|que sigue|que hacemos|resumen|progreso|avance|como vamos|cuanto llevamos)/.test(t)) return asisRecomendar();
+  if(/(pendiente|por contar|sin contar|falta contar|faltan por contar|falta por contar)/.test(t)) return asisPendientes();
+  if(/\b(diferencias?|faltantes?|sobrantes?|descuadr\w*|no cuadra\w*)\b/.test(t)) return asisDiferencias();
+
+  // 3) buscar un material
+  const tokens=asisTokensProducto(w);
+  if(!tokens.length) return agregarMsgAsistente('bot','Dime el nombre o el SKU del material que buscas.');
+  const c=buscarMateriales(tokens);
+  if(!c.length) return agregarMsgAsistente('bot','No encontré ningún material que coincida con “'+esc(tokens.join(' '))+'”. Intenta con otra palabra o el SKU exacto.');
+  if(c.length===1) return asisMostrar(c[0]);
+  const uid=++ASIS_UID;
+  ASIS.pendiente={tipo:'elegir', uid, ids:c.map(p=>p.id), acc:{tipo:'info'}};
+  agregarMsgAsistente('bot','Encontré varios. ¿Cuál es? (toca uno o dime el número)<div class="asis-chips">'+c.map((p,i)=>chip((i+1)+'. '+esc(p.desc)+' ('+esc(p.sku)+')',`asisElegir(${uid},'${p.id}')`)).join('')+'</div>');
 }
+
+/* ---- consultas ---- */
+function asisInfoHtml(p){
+  const d=calcDiff(p), pend=sinConteo(p);
+  const imps=importacion.filter(x=>normDesc(x.desc)===normDesc(p.desc));
+  const bod=imps.length ? '<br>'+imps.map(x=>'Bodega '+esc(x.bod)+': <b>'+fmtNum(x.saldo)+'</b>').join(' · ') : '';
+  const cls=d.diff>0?'pos-sobra':d.diff<0?'pos-falta':'pos-ok';
+  return `<b>${esc(p.desc)}</b> <span class="sku">${esc(p.sku)}</span><br>`
+    + `Sistema: <b>${fmtNum(p.sistema)}</b> · Contado: <b>${pend?'sin contar':fmtNum(p.contado)}</b>`
+    + (pend?'':` · Dif: <b class="${cls}">${d.diff>0?'+':''}${d.diff}</b>`)
+    + bod + `<br>📍 ${ubicacionTextoDeProducto(p)}`
+    + `<div class="asis-foto" data-sku="${esc(p.sku)}"></div>`;
+}
+function asisMostrar(p){
+  const div=agregarMsgAsistente('bot', asisInfoHtml(p));
+  const cont=div.querySelector('.asis-foto');
+  pintarFoto(cont, p.sku, null);
+  obtenerFoto(p.sku).then(url=>{ if(url) pintarFoto(cont,p.sku,url); });
+}
+function asisPendientes(){
+  const pend=totalInv.filter(sinConteo);
+  if(!pend.length) return agregarMsgAsistente('bot','🎉 No queda nada pendiente por contar.');
+  const top=pend.slice().sort((a,b)=>(b.sistema||0)-(a.sistema||0)).slice(0,10);
+  agregarMsgAsistente('bot',`Faltan <b>${pend.length}</b> productos por contar (de ${totalInv.length}). Los de más volumen en sistema:<ul>`+top.map(p=>`<li>${esc(p.desc)} <span style="color:var(--tenue)">(sistema ${fmtNum(p.sistema)})</span></li>`).join('')+'</ul>');
+}
+function asisDiferencias(){
+  const dif=totalInv.filter(p=>!sinConteo(p) && calcDiff(p).diff!==0).sort((a,b)=>Math.abs(calcDiff(b).diff)-Math.abs(calcDiff(a).diff));
+  if(!dif.length) return agregarMsgAsistente('bot','✅ Todo lo contado cuadra con el sistema.');
+  const li=p=>{ const d=calcDiff(p); return `<li>${esc(p.desc)}: sistema ${fmtNum(p.sistema)}, contado ${fmtNum(p.contado)} → <b class="${d.diff>0?'pos-sobra':'pos-falta'}">${d.diff>0?'+':''}${d.diff}</b></li>`; };
+  agregarMsgAsistente('bot',`Hay <b>${dif.length}</b> productos con diferencia. Las más grandes:<ul>`+dif.slice(0,8).map(li).join('')+'</ul>');
+}
+function asisRecomendar(){
+  const total=totalInv.length, pend=totalInv.filter(sinConteo), contados=total-pend.length;
+  const pct=total?Math.round(contados/total*100):0;
+  const dif=totalInv.filter(p=>!sinConteo(p) && calcDiff(p).diff!==0);
+  const faltan=dif.filter(p=>calcDiff(p).diff<0).sort((a,b)=>calcDiff(a).diff-calcDiff(b).diff);
+  const sobran=dif.filter(p=>calcDiff(p).diff>0).sort((a,b)=>calcDiff(b).diff-calcDiff(a).diff);
+  const bajos=totalInv.filter(p=>p.umbral>0 && (sinConteo(p)?(p.sistema||0):(p.contado||0))<=p.umbral);
+  const pasos=[];
+  if(bajos.length) pasos.push(`<b>Stock bajo:</b> ${bajos.length} producto(s) por debajo de su alerta (${bajos.slice(0,3).map(p=>esc(p.desc)).join(', ')}${bajos.length>3?'…':''}). Es lo más urgente para no quedarte sin material.`);
+  if(faltan.length) pasos.push(`<b>Revisa los faltantes grandes antes de ajustar nada:</b> ${faltan.slice(0,3).map(p=>esc(p.desc)+' ('+calcDiff(p).diff+')').join('; ')}. Vuelve a contarlos y busca salidas sin registrar.`);
+  if(pend.length) pasos.push(`<b>Termina los pendientes:</b> faltan ${pend.length} por contar (${100-pct}% del catálogo). Empieza por los de más volumen en sistema.`);
+  if(sobran.length) pasos.push(`<b>Sobrantes:</b> ${sobran.slice(0,3).map(p=>esc(p.desc)+' (+'+calcDiff(p).diff+')').join('; ')}. Probablemente hay entradas sin registrar.`);
+  if(!pasos.length) pasos.push('Todo está al día: contado completo y sin diferencias. 👏');
+  agregarMsgAsistente('bot',`📊 Llevas <b>${pct}%</b> del conteo (${contados} de ${total}).<br><br>Lo que yo haría, en este orden:<ol style="margin:6px 0 0;padding-left:18px;">`+pasos.map(x=>'<li style="margin-bottom:5px">'+x+'</li>').join('')+'</ol>'
+    +`<div class="asis-chips">${chip('Ver pendientes',"asisRapido('pendientes por contar')")}${chip('Ver diferencias',"asisRapido('diferencias')")}</div>`);
+}
+
+/* ---- órdenes: resolver material → cantidad → bodega → confirmar → ejecutar ---- */
+function asisResolverProducto(acc){
+  if(!acc.tokens.length){ ASIS.pendiente={tipo:'material',uid:++ASIS_UID,acc}; return agregarMsgAsistente('bot','¿De qué material? Dime el nombre o el SKU.'); }
+  const c=buscarMateriales(acc.tokens);
+  if(!c.length) return agregarMsgAsistente('bot','No encontré ningún material con “'+esc(acc.tokens.join(' '))+'”. Prueba con otra palabra o el SKU.');
+  const claro=asisGanadorClaro(c,acc.tokens);
+  if(c.length===1 || claro){ acc.pid=(claro||c[0]).id; return asisSiguientePaso(acc); }
+  const uid=++ASIS_UID;
+  ASIS.pendiente={tipo:'elegir',uid,ids:c.map(p=>p.id),acc};
+  agregarMsgAsistente('bot','Encontré varios. ¿Cuál es? (toca uno o dime el número)<div class="asis-chips">'+c.map((p,i)=>chip((i+1)+'. '+esc(p.desc)+' ('+esc(p.sku)+')',`asisElegir(${uid},'${p.id}')`)).join('')+'</div>');
+}
+function asisElegir(uid,id){
+  const pd=ASIS.pendiente;
+  if(!pd || pd.uid!==uid || pd.tipo!=='elegir'){ return agregarMsgAsistente('bot','Esa opción ya no está activa.'); }
+  ASIS.pendiente=null;
+  const p=totalInv.find(x=>x.id===id); if(!p) return;
+  if(pd.acc.tipo==='info') return asisMostrar(p);
+  pd.acc.pid=id; asisSiguientePaso(pd.acc);
+}
+function asisSiguientePaso(acc){
+  const p=totalInv.find(x=>x.id===acc.pid); if(!p) return;
+  if(acc.cantidad==null){
+    ASIS.pendiente={tipo:'cantidad',uid:++ASIS_UID,acc};
+    return agregarMsgAsistente('bot','¿Cuántas unidades de <b>'+esc(p.desc)+'</b>?');
+  }
+  if(!(acc.cantidad>0) && acc.tipo!=='fijar'){ return agregarMsgAsistente('bot','La cantidad tiene que ser mayor que cero.'); }
+  const al=asisAlcance(acc,p);
+  if(al.sistema && !acc.impId){
+    const imps=importacion.filter(x=>normDesc(x.desc)===normDesc(p.desc));
+    if(imps.length===1) acc.impId=imps[0].id;
+    else if(imps.length>1){
+      const uid=++ASIS_UID;
+      ASIS.pendiente={tipo:'bodega',uid,acc,opciones:imps.map(x=>x.id)};
+      return agregarMsgAsistente('bot','<b>'+esc(p.desc)+'</b> está en varias bodegas. ¿En cuál?<div class="asis-chips">'+imps.map(x=>chip('Bodega '+esc(x.bod)+' ('+fmtNum(x.saldo)+')',`asisBodega(${uid},'${x.id}')`)).join('')+'</div>');
+    }
+  }
+  asisConfirmar(acc);
+}
+function asisBodega(uid,impId){
+  const pd=ASIS.pendiente;
+  if(!pd || pd.uid!==uid || pd.tipo!=='bodega') return agregarMsgAsistente('bot','Esa opción ya no está activa.');
+  ASIS.pendiente=null; pd.acc.impId=impId; asisConfirmar(pd.acc);
+}
+function asisAlcance(acc,p){
+  if(acc.tipo==='fijar') return {sistema:false,conteo:true};
+  if(acc.scope==='conteo') return {sistema:false,conteo:true};
+  if(acc.scope==='sistema') return {sistema:true,conteo:false};
+  if(acc.scope==='ambos') return {sistema:true,conteo:true};
+  return {sistema:true,conteo:!sinConteo(p)}; // sin decir dónde: sistema, y conteo si el producto ya se contó
+}
+function asisConfirmar(acc){
+  const p=totalInv.find(x=>x.id===acc.pid); if(!p) return;
+  const al=asisAlcance(acc,p);
+  const delta=acc.tipo==='restar'?-acc.cantidad:acc.cantidad;
+  const lineas=[];
+  if(acc.tipo==='fijar') lineas.push('Conteo: '+(sinConteo(p)?'sin contar':fmtNum(p.contado))+' → <b>'+fmtNum(acc.cantidad)+'</b>');
+  else {
+    if(al.sistema) lineas.push('Sistema: '+fmtNum(p.sistema)+' → <b>'+fmtNum((p.sistema||0)+delta)+'</b>');
+    if(al.conteo) lineas.push('Conteo: '+(sinConteo(p)?'sin contar':fmtNum(p.contado))+' → <b>'+fmtNum((p.contado||0)+delta)+'</b>');
+    else if(al.sistema && acc.scope==='auto') lineas.push('<span style="color:var(--tenue)">Conteo: sin cambios (este producto aún no se ha contado)</span>');
+  }
+  const verbo=acc.tipo==='fijar'?'dejar el conteo en '+fmtNum(acc.cantidad):(acc.tipo==='sumar'?'sumar ':'restar ')+fmtNum(acc.cantidad);
+  const imp=acc.impId?importacion.find(x=>x.id===acc.impId):null;
+  const uid=++ASIS_UID;
+  ASIS.pendiente={tipo:'confirmar',uid,acc};
+  agregarMsgAsistente('bot',`Voy a <b>${verbo}</b> en <b>${esc(p.desc)}</b> <span class="sku">${esc(p.sku)}</span>${imp?' (bodega '+esc(imp.bod)+')':''}:<ul>${lineas.map(l=>'<li>'+l+'</li>').join('')}</ul>`
+    +`<div class="asis-chips">${chip('✅ Confirmar',`asisSi(${uid})`,'ok')}${chip('✖ Cancelar',`asisNo(${uid})`,'no')}</div>`);
+}
+function asisSi(uid){
+  const pd=ASIS.pendiente;
+  if(!pd || pd.uid!==uid || pd.tipo!=='confirmar') return agregarMsgAsistente('bot','Esa confirmación ya no está activa.');
+  ASIS.pendiente=null; asisEjecutar(pd.acc);
+}
+function asisNo(uid){
+  const pd=ASIS.pendiente;
+  if(pd && pd.uid===uid){ ASIS.pendiente=null; agregarMsgAsistente('bot','Listo, cancelado. No cambié nada.'); }
+}
+function asisEjecutar(acc){
+  const p=totalInv.find(x=>x.id===acc.pid); if(!p) return agregarMsgAsistente('bot','No encontré el material (¿se eliminó?).');
+  const al=asisAlcance(acc,p);
+  const quien=SESION?SESION.nombre:'Asistente';
+  const ahora=new Date().toISOString();
+  if(acc.tipo==='fijar'){
+    p.contado=acc.cantidad; p.contadoPor=quien; p.fechaConteo=ahora; p.actualizado=ahora;
+    saveTotal(true);
+  } else if(!al.sistema){ // solo conteo
+    const delta=acc.tipo==='restar'?-acc.cantidad:acc.cantidad;
+    p.contado=(p.contado||0)+delta; p.contadoPor=p.contadoPor||quien; p.fechaConteo=ahora; p.actualizado=ahora;
+    saveTotal(true);
+  } else {
+    const tipoMov=acc.tipo==='sumar'?'entrada':'salida';
+    const objetivo=(acc.impId && importacion.find(x=>x.id===acc.impId)) || p;
+    const r=aplicarMovimientoDoble(objetivo, tipoMov, acc.cantidad, {responsable:quien, conteo: acc.scope==='ambos' ? true : (al.conteo?'auto':false)});
+    movimientos.push({id:'mov'+Date.now(), fecha:ahora, tipo:tipoMov, sku:p.sku, desc:p.desc, cantidad:acc.cantidad, responsable:quien, proveedor:'', guia:'', obs:'Asistente'+(r.contadoAfectado?' (sistema y conteo)':' (sistema)'), conteo:r.contadoAfectado});
+    saveMovimientos();
+    guardarTrasMovimiento(r.fuente);
+  }
+  renderImportacion(); renderTotal(); renderMovimientos(); renderVerificacion(); renderDashboard();
+  const fresco=totalInv.find(x=>x.id===acc.pid)||p;
+  agregarMsgAsistente('bot','✅ Listo y guardado.<br>'+asisInfoHtml(fresco).replace(/<div class="asis-foto"[^>]*><\/div>$/,''));
+}
+function asisManejarPendiente(t){
+  const pd=ASIS.pendiente; if(!pd) return false;
+  const w=asisPalabras(t);
+  const cancela=/^(no|nop|nel|cancela|cancelar|olvidalo|olvida|dejalo|para|detente|mejor no)\b/.test(t);
+  const acepta=/^(si|sii|sip|claro|confirmo|confirma|confirmado|dale|listo|ok|okay|hazlo|correcto|de una|adelante|procede)\b/.test(t);
+  if(pd.tipo==='confirmar'){
+    if(acepta){ ASIS.pendiente=null; asisEjecutar(pd.acc); return true; }
+    if(cancela){ ASIS.pendiente=null; agregarMsgAsistente('bot','Listo, cancelado. No cambié nada.'); return true; }
+    return false;
+  }
+  if(cancela){ ASIS.pendiente=null; agregarMsgAsistente('bot','Cancelado.'); return true; }
+  if(pd.tipo==='cantidad'){
+    for(let i=0;i<w.length;i++){ const n=asisNumeroEn(w,i); if(n){ ASIS.pendiente=null; pd.acc.cantidad=n.valor; asisSiguientePaso(pd.acc); return true; } }
+    return false;
+  }
+  if(pd.tipo==='material'){
+    if(asisBuscarVerbo(w)) return false;
+    ASIS.pendiente=null; pd.acc.tokens=asisTokensProducto(w); asisResolverProducto(pd.acc); return true;
+  }
+  if(pd.tipo==='elegir'){
+    if(w.length===1 && (ORDINALES[w[0]] || /^\d+$/.test(w[0]))){
+      const idx=(ORDINALES[w[0]]||parseInt(w[0],10))-1;
+      if(idx>=0 && idx<pd.ids.length){ asisElegir(pd.uid, pd.ids[idx]); return true; }
+    }
+    const m=t.match(/^(?:el|la|opcion|numero)\s+(\S+)$/);
+    if(m){ const idx=(ORDINALES[m[1]]||parseInt(m[1],10))-1; if(idx>=0 && idx<pd.ids.length){ asisElegir(pd.uid, pd.ids[idx]); return true; } }
+    if(!asisBuscarVerbo(w)){
+      const c=buscarMateriales(asisTokensProducto(w)).filter(p=>pd.ids.includes(p.id));
+      if(c.length===1){ asisElegir(pd.uid,c[0].id); return true; }
+    }
+    return false;
+  }
+  if(pd.tipo==='bodega'){
+    const imp=pd.opciones.map(id=>importacion.find(x=>x.id===id)).find(x=>x && w.includes(String(x.bod).toLowerCase()));
+    if(imp){ asisBodega(pd.uid,imp.id); return true; }
+    return false;
+  }
+  return false;
+}
+
+/* ---- voz (micrófono del navegador, español de Colombia) ---- */
+let ASIS_RECO=null, ASIS_ESCUCHANDO=false;
+function alternarMicrofono(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ agregarMsgAsistente('bot','Este navegador no permite voz. Usa Chrome (Android o computador) o el teclado del celular con su micrófono 🎤.'); return; }
+  if(ASIS_ESCUCHANDO){ ASIS_RECO.stop(); return; }
+  const input=document.getElementById('asistenteInput'), btn=document.getElementById('asisMic');
+  const ph0=input.placeholder;
+  ASIS_RECO=new SR(); ASIS_RECO.lang='es-CO'; ASIS_RECO.interimResults=true; ASIS_RECO.continuous=false;
+  ASIS_RECO.onstart=()=>{ ASIS_ESCUCHANDO=true; btn.classList.add('mic-on'); input.placeholder='🎙️ Escuchando...'; };
+  ASIS_RECO.onresult=e=>{
+    const txt=Array.from(e.results).map(r=>r[0].transcript).join(' ');
+    input.value=txt;
+    if(e.results[e.results.length-1].isFinal){ preguntarAsistente(); }
+  };
+  ASIS_RECO.onerror=e=>{
+    const m={'not-allowed':'Permite el micrófono en el navegador para poder hablarme.','service-not-allowed':'Permite el micrófono en el navegador para poder hablarme.','no-speech':'No te escuché. Toca 🎤 e inténtalo de nuevo.','audio-capture':'No encuentro un micrófono.','network':'La voz necesita internet.'}[e.error];
+    if(m) agregarMsgAsistente('bot',m);
+  };
+  ASIS_RECO.onend=()=>{ ASIS_ESCUCHANDO=false; btn.classList.remove('mic-on'); input.placeholder=ph0; };
+  try{ ASIS_RECO.start(); }catch(e){ ASIS_ESCUCHANDO=false; }
+}
+
+/* ---- fotos de materiales (miniaturas de ~20 KB; se guardan local y en la nube) ---- */
+const K_IMG='jd3_img_';
+let FOTO_SKU=null;
+async function obtenerFoto(sku){
+  try{ const v=localStorage.getItem(K_IMG+sku); if(v) return v; }catch(e){}
+  const base=cloudBase(); if(!base) return null;
+  try{
+    const r=await fetch(base+'img_'+encodeURIComponent(sku),{cache:'no-store'});
+    if(r.ok){ const t=await r.text(); if(t && t.startsWith('data:image')){ try{ localStorage.setItem(K_IMG+sku,t); }catch(e){} return t; } }
+  }catch(e){}
+  return null;
+}
+async function guardarFoto(sku,dataUrl){
+  try{ localStorage.setItem(K_IMG+sku,dataUrl); }catch(e){}
+  return cloudSetText('img_'+encodeURIComponent(sku), dataUrl);
+}
+function redimensionarImagen(file,max){
+  max=max||360;
+  return new Promise((res,rej)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const k=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg',0.72));
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error('imagen')); };
+    img.src=url;
+  });
+}
+function pintarFoto(el,sku,url){
+  if(!el) return;
+  el.innerHTML = (url?`<img class="asis-img" alt="Foto del material" src="${url}">`:'')
+    + `<div class="asis-chips"><button class="asis-chip" data-sku="${esc(sku)}" onclick="pedirFoto(this.dataset.sku)">📷 ${url?'Cambiar foto':'Agregar foto'}</button></div>`;
+}
+function pedirFoto(sku){ FOTO_SKU=sku; document.getElementById('inputFoto').click(); }
+async function fotoElegida(evt){
+  const f=evt.target.files[0]; evt.target.value='';
+  if(!f || !FOTO_SKU) return;
+  const sku=FOTO_SKU; FOTO_SKU=null;
+  try{
+    const url=await redimensionarImagen(f);
+    const ok=await guardarFoto(sku,url);
+    toast(ok?'📷 Foto guardada':'📷 Foto guardada en este dispositivo (sin nube)');
+    document.querySelectorAll('.asis-foto').forEach(el=>{ if(el.dataset.sku===sku) pintarFoto(el,sku,url); });
+  }catch(e){ toast('No pude procesar esa foto'); }
+}
+
 document.getElementById('asistenteBtn').style.display='none'; // se muestra al iniciar sesión (perfiles internos)
 
 /* ---------------- INIT ---------------- */
