@@ -764,6 +764,17 @@ function intentarLogin(){
   err.textContent='';
   aplicarSesion();
   if(PENDING_SKU){ abrirFichaRapidaPorSku(PENDING_SKU); PENDING_SKU=null; }
+  avisarSiSinNube();
+}
+/* Si este dispositivo todavía no tiene el código de sincronización, las entradas/salidas
+   que se hagan aquí se quedan solo en este aparato y nadie más las va a ver. Se avisa
+   fuerte (no un toast que se pierde) y se abre directo la configuración. */
+function avisarSiSinNube(){
+  if(CLOUD_BUCKET || !SESION || SESION.rol==='comercial') return;
+  setTimeout(()=>{
+    toast('⚠️ Este dispositivo NO está sincronizado: lo que registres aquí no se verá en los demás celulares/computadores');
+    abrirModalNube();
+  }, 700);
 }
 function cerrarSesionUsuario(){
   if(!confirm('¿Cerrar sesión en este dispositivo?')) return;
@@ -822,14 +833,22 @@ async function crearBucketNube(){
     renderConfigNube();
   }catch(e){ toast('No se pudo crear el código — revisa tu conexión a internet e intenta de nuevo'); }
 }
-function usarCodigoExistente(){
-  const val = document.getElementById('inputCodigoNube').value.trim();
+function usarCodigoExistente(inputId){
+  const val = document.getElementById(inputId||'inputCodigoNube').value.trim();
   if(!val){ toast('Pega el código que te dieron en el otro dispositivo'); return; }
   CLOUD_BUCKET = val;
   localStorage.setItem('jd3_cloud_bucket', val);
   toast('Código guardado — sincronizando...');
   renderConfigNube();
   loadAll();
+}
+function desconectarNube(){
+  if(!confirm('¿Desconectar este dispositivo de la nube? Vas a dejar de ver los cambios de los demás hasta que vuelvas a poner un código. Lo que ya está guardado aquí no se borra, solo deja de compartirse.')) return;
+  CLOUD_BUCKET='';
+  localStorage.removeItem('jd3_cloud_bucket');
+  setSync(false);
+  toast('Dispositivo desconectado de la nube');
+  renderConfigNube();
 }
 function copiarCodigoNube(){
   navigator.clipboard.writeText(CLOUD_BUCKET).then(()=>toast('Código copiado')).catch(()=>toast('Copia manual: '+CLOUD_BUCKET));
@@ -859,6 +878,17 @@ function renderConfigNube(){
       <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--borde);">
         <div class="hint" style="margin-bottom:8px;color:var(--rojo);">⚠️ Zona avanzada: reemplaza TODO el Inventario Total y las Canastillas (en este dispositivo y en la nube) por los datos más recientes que quedaron incrustados en el código. Se pierde cualquier conteo hecho después de la última actualización.</div>
         <button class="btn btn-danger btn-sm" onclick="resetearConDatosNuevos()">🔄 Restablecer catálogo con los datos nuevos</button>
+      </div>
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--borde);">
+        <button class="btn btn-ghost btn-sm" id="btnMostrarCambiarCodigo" onclick="document.getElementById('cambiarCodigoWrap').style.display='block'; document.getElementById('btnMostrarCambiarCodigo').style.display='none';">🔧 Cambiar el código de ESTE dispositivo</button>
+        <div id="cambiarCodigoWrap" style="display:none;margin-top:10px;">
+          <div class="hint" style="margin-bottom:8px;">⚠️ Debe ser el MISMO código en todos los dispositivos del equipo — no uno distinto por persona, o cada quien queda viendo su propia copia sin ver a los demás.</div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <input type="text" id="inputCodigoNube2" placeholder="Pega el código correcto aquí" style="flex:1;background:var(--negro);border:1.5px solid var(--borde);color:var(--texto);padding:9px 11px;border-radius:7px;font-size:13px;">
+            <button class="btn btn-ghost btn-sm" onclick="usarCodigoExistente('inputCodigoNube2')">Usar</button>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="desconectarNube()">🔌 Desconectar este dispositivo de la nube</button>
+        </div>
       </div>
       ${htmlClavesAcceso()}`;
   } else {
@@ -2190,7 +2220,7 @@ const IC_ALIAS = {
   sku:['SKU','CODIGO','COD','CODIGOPRODUCTO','CODIGOSKU','REFERENCIA','REF'],
   desc:['DESCRIPCION','DESCRIP','PRODUCTO','MATERIAL','NOMBRE','ARTICULO','DETALLE','DESCRIPCIONPRODUCTO'],
   contado:['INVCONTADO','INVENTARIOCONTADO','CONTADO','CONTEO','CONTEOFISICO','FISICO','INVFISICO','CANTIDADCONTADA','CANTIDADFISICA'],
-  sistema:['INVSISTEMA','INVENTARIOSISTEMA','SISTEMA','CANTIDADSISTEMA','EXISTENCIASISTEMA','SALDO','STOCK'],
+  sistema:['INVSISTEMA','INVENTARIOSISTEMA','SISTEMA','CANTIDADSISTEMA','EXISTENCIASISTEMA','SALDO','STOCK','SIIGO','SIGO','SIIGONUBE','INVSIIGO'],
   gen:['CANTIDAD','CANT','EXISTENCIA','EXISTENCIAS','UNIDADES'],   // ambiguas: el usuario elige si es conteo o sistema
   por:['CONTADOPOR','RESPONSABLE','CONTADOR'],
   canast:['CANASTILLAS','CANASTILLA','UBICACION']
@@ -2941,11 +2971,9 @@ loadAll().then(()=>{
   if(!esVistaPublica){
     aplicarSesion(); // muestra el login si no hay sesión guardada en este dispositivo
     if(SESION && PENDING_SKU){ abrirFichaRapidaPorSku(PENDING_SKU); PENDING_SKU=null; }
+    avisarSiSinNube();
   }
 });
-if(!CLOUD_BUCKET){
-  setTimeout(()=>{ toast('Activa la sincronización en la nube desde ⚙️ en el menú'); }, 1200);
-}
 </script>
 </body>
 </html>
