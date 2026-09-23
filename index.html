@@ -711,8 +711,9 @@
 /* ===========================================================
    J.D ELÉCTRICOS — ERP v3
    Guardado GARANTIZADO en localStorage de este dispositivo +
-   sincronización en la nube en segundo plano (kvdb.io, sin
-   cuenta). Si la nube no responde, todo sigue funcionando local.
+   sincronización en la nube en segundo plano (Firebase Realtime
+   Database, conexión automática para todos). Si la nube no
+   responde, todo sigue funcionando local.
    =========================================================== */
 
 let importacion = [];
@@ -809,99 +810,31 @@ function cambiarTab(tab){
   if(tab==='bodegas') renderBodegas();
   if(tab==='movimientos') renderMovimientos();
 }
-/* La sincronización en la nube usa kvdb.io, que EXIGE crear una
-   "bucket" real antes de usarla (no se puede inventar un nombre).
-   La app crea la bucket la primera vez que se usa en un dispositivo
-   y genera un CÓDIGO DE SINCRONIZACIÓN. Ese mismo código se copia
-   una sola vez en los demás dispositivos para que todos compartan
-   el mismo inventario en la nube. Sin código configurado, el
-   sistema sigue funcionando 100% local (nunca se pierde nada). */
-let CLOUD_BUCKET = localStorage.getItem('jd3_cloud_bucket') || '';
-function cloudBase(){ return CLOUD_BUCKET ? ('https://kvdb.io/'+CLOUD_BUCKET+'/') : null; }
-async function crearBucketNube(){
-  try{
-    const res = await fetch('https://kvdb.io/', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'email=inventario@jdelectricos.local'});
-    if(!res.ok) throw new Error('fail');
-    const bucketId = (await res.text()).trim();
-    if(!bucketId || bucketId.length>60) throw new Error('respuesta inválida');
-    CLOUD_BUCKET = bucketId;
-    localStorage.setItem('jd3_cloud_bucket', bucketId);
-    toast('Código de sincronización creado');
-    await cloudSet(K_IMP,importacion); await cloudSet(K_TOT,totalInv); await cloudSet(K_CAN,canastillas); await cloudSet(K_MOV,movimientos);
-    publicarFichasQR();
-    setSync(true);
-    renderConfigNube();
-  }catch(e){ toast('No se pudo crear el código — revisa tu conexión a internet e intenta de nuevo'); }
-}
-function usarCodigoExistente(inputId){
-  const val = document.getElementById(inputId||'inputCodigoNube').value.trim();
-  if(!val){ toast('Pega el código que te dieron en el otro dispositivo'); return; }
-  CLOUD_BUCKET = val;
-  localStorage.setItem('jd3_cloud_bucket', val);
-  toast('Código guardado — sincronizando...');
-  renderConfigNube();
-  loadAll();
-}
-function desconectarNube(){
-  if(!confirm('¿Desconectar este dispositivo de la nube? Vas a dejar de ver los cambios de los demás hasta que vuelvas a poner un código. Lo que ya está guardado aquí no se borra, solo deja de compartirse.')) return;
-  CLOUD_BUCKET='';
-  localStorage.removeItem('jd3_cloud_bucket');
-  setSync(false);
-  toast('Dispositivo desconectado de la nube');
-  renderConfigNube();
-}
-function copiarCodigoNube(){
-  navigator.clipboard.writeText(CLOUD_BUCKET).then(()=>toast('Código copiado')).catch(()=>toast('Copia manual: '+CLOUD_BUCKET));
-}
+/* Sincronización en la nube: Firebase Realtime Database.
+   Todos los dispositivos (celulares y computadores) apuntan SIEMPRE
+   a la misma base de datos de la empresa — no hace falta ningún
+   código ni link especial, basta con abrir el sistema y ya queda
+   conectado automáticamente. Si por algún motivo no hay internet,
+   el sistema sigue funcionando 100% local y sincroniza solo cuando
+   vuelva la conexión. */
+const FIREBASE_URL = 'https://deuz-jd-default-rtdb.firebaseio.com';
+let CLOUD_BUCKET = 'firebase'; // siempre activo — ya no se usa código manual
+function cloudBase(){ return FIREBASE_URL + '/'; }
+function copiarCodigoNube(){ /* ya no aplica: la conexión es automática */ }
 function renderConfigNube(){
   const el = document.getElementById('configNubeBody');
   if(!el) return;
-  if(CLOUD_BUCKET){
-    const linkCompartir = urlCompartirPrincipal();
-    el.innerHTML = `
-      <div class="hint" style="margin-bottom:10px;">✅ Sincronización activa. Para conectar OTRO dispositivo, copia este código y pégalo ahí en "Ya tengo un código":</div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
-        <div class="sku" style="font-size:15px;background:var(--negro);border:1px solid var(--borde);padding:8px 12px;border-radius:8px;flex:1;word-break:break-all;">${CLOUD_BUCKET}</div>
-        <button class="btn btn-ghost btn-sm" onclick="copiarCodigoNube()">📋 Copiar</button>
-      </div>
-      ${linkCompartir? `
-      <div class="hint" style="margin-bottom:8px;">O más fácil: mándale este link completo por WhatsApp a quien necesite entrar — al abrirlo, su celular queda conectado solo (Android o iPhone):</div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <div style="font-size:11px;background:var(--negro);border:1px solid var(--borde);padding:8px 10px;border-radius:8px;flex:1;word-break:break-all;color:var(--tenue);">${linkCompartir}</div>
-        <button class="btn btn-ghost btn-sm" onclick="copiarLinkCompartir()">📋 Copiar link</button>
-      </div>` : `<div class="hint">Para tener también un link con el código incluido, aloja el archivo en una URL web real (ver guía de GitHub Pages).</div>`}
-      <div class="hint" style="margin-top:12px;">💡 Cada código QR de producto ya incluye este código automáticamente — cualquiera que lo escanee queda conectado sin hacer nada más.</div>
-      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--borde);">
-        <div class="hint" style="margin-bottom:8px;">¿Ves "Guardado local (sin nube)" arriba? El servicio gratuito tiene un límite de consultas por hora — nada se pierde, solo espera un rato y prueba este botón:</div>
-        <button class="btn btn-primary btn-sm" onclick="reintentarSincronizacion()" id="btnReintentarSync">🔁 Reintentar sincronización ahora</button>
-      </div>
-      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--borde);">
-        <div class="hint" style="margin-bottom:8px;color:var(--rojo);">⚠️ Zona avanzada: reemplaza TODO el Inventario Total y las Canastillas (en este dispositivo y en la nube) por los datos más recientes que quedaron incrustados en el código. Se pierde cualquier conteo hecho después de la última actualización.</div>
-        <button class="btn btn-danger btn-sm" onclick="resetearConDatosNuevos()">🔄 Restablecer catálogo con los datos nuevos</button>
-      </div>
-      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--borde);">
-        <button class="btn btn-ghost btn-sm" id="btnMostrarCambiarCodigo" onclick="document.getElementById('cambiarCodigoWrap').style.display='block'; document.getElementById('btnMostrarCambiarCodigo').style.display='none';">🔧 Cambiar el código de ESTE dispositivo</button>
-        <div id="cambiarCodigoWrap" style="display:none;margin-top:10px;">
-          <div class="hint" style="margin-bottom:8px;">⚠️ Debe ser el MISMO código en todos los dispositivos del equipo — no uno distinto por persona, o cada quien queda viendo su propia copia sin ver a los demás.</div>
-          <div style="display:flex;gap:8px;margin-bottom:12px;">
-            <input type="text" id="inputCodigoNube2" placeholder="Pega el código correcto aquí" style="flex:1;background:var(--negro);border:1.5px solid var(--borde);color:var(--texto);padding:9px 11px;border-radius:7px;font-size:13px;">
-            <button class="btn btn-ghost btn-sm" onclick="usarCodigoExistente('inputCodigoNube2')">Usar</button>
-          </div>
-          <button class="btn btn-danger btn-sm" onclick="desconectarNube()">🔌 Desconectar este dispositivo de la nube</button>
-        </div>
-      </div>
-      ${htmlClavesAcceso()}`;
-  } else {
-    el.innerHTML = `
-      <div class="hint" style="margin-bottom:12px;">Aún no hay sincronización en la nube configurada. El sistema funciona 100% local en este dispositivo hasta que actives esto.</div>
-      <button class="btn btn-primary btn-sm" onclick="crearBucketNube()" style="margin-bottom:16px;">🆕 Crear código de sincronización (primer dispositivo)</button>
-      <div class="hint" style="margin-bottom:6px;">¿Ya tienes un código de otro dispositivo? Pégalo aquí:</div>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="inputCodigoNube" placeholder="Pega el código aquí" style="flex:1;background:var(--negro);border:1.5px solid var(--borde);color:var(--texto);padding:9px 11px;border-radius:7px;font-size:13px;">
-        <button class="btn btn-ghost btn-sm" onclick="usarCodigoExistente()">Usar</button>
-      </div>
-      ${htmlClavesAcceso()}`;
-  }
+  el.innerHTML = `
+    <div class="hint" style="margin-bottom:10px;">✅ Este dispositivo está conectado automáticamente a la nube compartida de J.D ELÉCTRICOS. No necesitas ningún código: cualquiera que abra el sistema (desde el link de GitHub Pages) queda sincronizado con todos los demás, incluyendo lo que se registre escaneando QR.</div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--borde);">
+      <div class="hint" style="margin-bottom:8px;">¿Ves "Guardado local (sin nube)" arriba? Puede ser que no haya internet en este momento — nada se pierde, solo espera y prueba este botón:</div>
+      <button class="btn btn-primary btn-sm" onclick="reintentarSincronizacion()" id="btnReintentarSync">🔁 Reintentar sincronización ahora</button>
+    </div>
+    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--borde);">
+      <div class="hint" style="margin-bottom:8px;color:var(--rojo);">⚠️ Zona avanzada: reemplaza TODO el Inventario Total y las Canastillas (en este dispositivo y en la nube) por el catálogo original de fábrica. Se pierde cualquier conteo hecho después de la última actualización.</div>
+      <button class="btn btn-danger btn-sm" onclick="resetearConDatosNuevos()">🔄 Restablecer catálogo con los datos nuevos</button>
+    </div>
+    ${htmlClavesAcceso()}`;
 }
 function htmlClavesAcceso(){
   if(!SESION || SESION.rol!=='coordinador') return '';
@@ -985,11 +918,11 @@ function localGet(key){ try{ const v=localStorage.getItem(key); return v?JSON.pa
 function localSet(key,value){ try{ localStorage.setItem(key, JSON.stringify(value)); return true; }catch(e){ return false; } }
 async function cloudGet(key){
   const base = cloudBase(); if(!base) return undefined;
-  try{ const res=await fetch(base+key,{method:'GET',cache:'no-store'}); if(res.status===404) return null; if(!res.ok) throw 0; const t=await res.text(); return t?JSON.parse(t):null; }
+  try{ const res=await fetch(base+key+'.json',{method:'GET',cache:'no-store'}); if(!res.ok) throw 0; const t=await res.text(); return (t && t!=='null')?JSON.parse(t):null; }
   catch(e){ return undefined; }
 }
-async function cloudSet(key,value){ const base=cloudBase(); if(!base) return false; try{ const res=await fetch(base+key,{method:'PUT',body:JSON.stringify(value)}); return res.ok; }catch(e){ return false; } }
-async function cloudSetText(key,text){ const base=cloudBase(); if(!base) return false; try{ const res=await fetch(base+key,{method:'PUT',body:text}); return res.ok; }catch(e){ return false; } }
+async function cloudSet(key,value){ const base=cloudBase(); if(!base) return false; try{ const res=await fetch(base+key+'.json',{method:'PUT',body:JSON.stringify(value===undefined?null:value)}); return res.ok; }catch(e){ return false; } }
+async function cloudSetText(key,text){ return cloudSet(key,text); }
 
 async function loadAll(){
   importacion = localGet(K_IMP) || semillaImportacion();
@@ -1068,10 +1001,8 @@ document.addEventListener('keydown', ev=>{
 });
 
 
-/* Revisa cambios de otros dispositivos cada 15s. No se puede bajar más:
-   kvdb.io (el servicio gratuito de nube) permite máximo 1000 consultas por
-   hora por conexión a internet — revisar cada segundo lo superaría en minutos
-   y tumbaría la sincronización para todos en la misma red. Lo que TÚ guardas
+/* Revisa cambios de otros dispositivos cada 15s (Firebase, plan gratuito,
+   soporta esto de sobra para un equipo de este tamaño). Lo que TÚ guardas
    siempre es instantáneo; este intervalo solo afecta qué tan rápido ves los
    cambios de otros dispositivos. */
 setInterval(async ()=>{
@@ -2911,8 +2842,8 @@ async function obtenerFoto(sku){
   try{ const v=localStorage.getItem(K_IMG+sku); if(v) return v; }catch(e){}
   const base=cloudBase(); if(!base) return null;
   try{
-    const r=await fetch(base+'img_'+encodeURIComponent(sku),{cache:'no-store'});
-    if(r.ok){ const t=await r.text(); if(t && t.startsWith('data:image')){ try{ localStorage.setItem(K_IMG+sku,t); }catch(e){} return t; } }
+    const r=await fetch(base+'img_'+encodeURIComponent(sku)+'.json',{cache:'no-store'});
+    if(r.ok){ const t=await r.text(); if(t && t!=='null'){ const val=JSON.parse(t); if(val && typeof val==='string' && val.startsWith('data:image')){ try{ localStorage.setItem(K_IMG+sku,val); }catch(e){} return val; } } }
   }catch(e){}
   return null;
 }
